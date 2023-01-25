@@ -4,10 +4,13 @@ It is assumed you have either the SES or Keil compilers installed and know how t
 
 Download the appropriate Nordic SDK:  https://www.nordicsemi.com/Products/Development-software/nRF5-SDK/Download#infotabs
     12.3.0 is the latest version that can be used with the nRF51 code.
-    17.1.0 and 17.0.2 can be used with the nFR52 code.
+    17.1.0 and 17.0.2 can be used with the nFR52 code. Earlier versions might require some minor changes.
+    Nordic is not making any more new releases after 17; just bug fixes.
     Note that the Bluetooth uses SoftDevice and not the SDK so porting to other versions of the SDK (SoftDevice) is probably quite easy.
 
-Copy the modules in the respective NRF5n directories into the %NRFSDK%/examples/ble_periferal/
+Copy the modules in the respective NRF5n directories into the %NRFSDK%/examples/ble_periferal/ directories.
+
+Select a Specialization to support:
 
 In the handleSpecializations.h file select which device specialization to support (Below the weight scale is being supported):
 
@@ -21,13 +24,19 @@ In the handleSpecializations.h file select which device specialization to suppor
 
 If using Keil, be sure that Flash/Configure Flash Tools/Debug/ that J-LINK / J-TRACE Cortex is selected in the drop down box to the far right. 
 It may be set to a ULINK option out of the box.
-               Clicking on the Settings button to the left of this input box should show the Port box set to 'S
+               Clicking on the Settings button to the left of this input box should show the Port box set to 'SW'
 Be sure Flash/Configure Flash Tools/Utilities/(press Settings button) Reset and Run is checked. If not, you will need to press the BOTT/RESET button
 on a flash before the program will run.
+
+On the nRF51 platform, be sure to set the STACK SIZE and HEAP_SIZE to 4096. It can be done by setting a preprocessor Macro or directly in the
+assembly code 'arm_startup_nrf51.s' under Device in the Project window. The GHS requires more memory and resources than the MET for a given 
+specialization and has a larger code size.
 
 Depending upon the version of the SES compiler you have, you may need to either remove (later versions) or keep (earlier versions) the 
 file SEGGER_RTT_Syscalls_SES.c.
 
-When flashing a build from SES, there is a bug where you have to press the boot/reset button before the program will work.
+When flashing a build from SES, there is a bug where you have to press the boot/reset button before the program will work. This bug is
+known and Segger is not going to address it.
+
 You do NOT need to do this once installed and/or after a power cycle.
 

@@ -2,8 +2,11 @@ The HealthAtHome.apk is the 'primary' client application. Without the Ghs or Met
 supports the BT-SIG health device standards and some proprietary devices.
 
 The GhsBtSigDriver.apk is a plugin which, when installed, gives the HealthAtHome application GHS support
-The MetDriver.apk is a plugin which, when installed, gives the HealthAtHome application MPM support.
+The MetDriver.apk is a plugin which, when installed, gives the HealthAtHome application Metric Packet Model (MPM) support.
 
 The drivers can be installed and uninstalled independent of the HealthAtHome application. There are
 additional plugins for other proprietary devices but they are not necessary for testing the GHS and
 MPM peripherals in this repository.
+
+Instructions for using Health@Home are given in "Using Health@Home.html". This is the same file that
+is displayed in the application when pressing the help (?) button while in the main screen.

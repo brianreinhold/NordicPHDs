@@ -1,6 +1,8 @@
 # Nordic-MPM-Health-Devices
 Support for the Metric Packet Model (MPM) Health Devices on Nordic platforms
 
+(At this time users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for references on the GHS)
+
 This respository contains code that runs on the Nordic nRF52840 and nRF51 DKs. The code that runs on the nRF52840 DK should also run without issue on the nRF52 DK though it has not been tested.
 
 Unlike the existing Bluetooth SIG health device profiles, the Metric Packet Model is generic and all health devices are supported by a single specification. The MPM is based upon the IEEE 11073 20601 Domain Information Model Objects though in a considerably simplified form. It is not necessary to understand the 20601 standard to work with the MPM. However, use of the MPM requires the understanding of the Medical Device Code (MDC) system and Mder Floats. The use of codes is totally foreign to the BT-SIG profiles but some of the profiles do use Mder Floats. Mder Floats are used to preserve precision.

@@ -1,0 +1,388 @@
+<html>
+<head>
+    <style>
+            .gfg {
+                width:auto;
+                text-align:center;
+                padding:2px;
+            }
+            img {
+                max-width:100%;
+                        height:auto;
+            }
+
+        .button {
+          background-color: #FFECB4; /* Green */
+          border: none;
+          color: black;
+          padding: 1px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          font-family: "Times New Roman", Times, serif;
+          margin: 4px 0px;
+          cursor: pointer;
+        }
+
+        .button1 {border-radius: 2px; background-color: #CCCCCC;}
+        .button2 {border-radius: 4px; color: green}
+        .button3 {border-radius: 8px;}
+        .button4 {border-radius: 12px;}
+        .button5 {border-radius: 50%; background-color: #EFCC40; color: white}
+
+    </style>
+</head>
+<body>
+
+<h1>Using Health@Home</h1>
+
+The main screen and its features are given below:
+
+<div class="gfg">
+    <p id="my-image">
+        <img src="file:///android_asset/main_screen_crop.png" alt="Main Screen"/>
+    </p>
+</div>
+
+<a name="Topics">
+<h3>Topics</h3></a>
+<ul>
+<li><a href="#Provisioning">Provisioning</a></li>
+<li><a href="#Un-Provisioned">Un-Provisioned</a></li>
+<li><a href="#Drivers">Drivers/Plugins</a></li>
+<li><a href="#Discovery">Device Discovery, Connection, Pairing</a></li>
+<li><a href="#Displays">Measurement Displays</a</li>
+<li><a href="#Uploads">Measurement Uploads</a</li>
+<li><a href="#Overflow">Menus: Overflow</a></li>
+<ul>
+<li><a href="#Connection">BLE Connection Options</a></li>
+<ul>
+<li><a href="#AutoConnect">Connect Automatically</a></li>
+<li><a href="#ConfirmConnect">Connect after Confirmation</a></li>
+<li><a href="#FindConnect">Find then Connect</a></li>
+</ul>
+<li><a href="#Delete">Delete All Measurements</a></li>
+<li><a href="#Settings">Settings</a></li>
+<ul>
+<li><a href="#Upload">Upload automatically</a></li>
+<li><a href="#PCD01">Enable/disable PCD-01 uploads</a></li>
+<li><a href="#PCD01-Config">Configure PCD-01 server endpoints</a></li>
+<li><a href="#FHIR">Enable/disable FHIR uploads</a></li>
+<li><a href="#FHIR-Config">Configure FHIR server endpoints</a></li>
+<li><a href="#Patients">Add/Edit Patients</a></li>
+<li><a href="#APS">Enable/disable the APS</a></li>
+<li><a href="#APS-Config">Configure APS server endpoints</a></li>
+<li><a href="#Whitelist">Configure Whitelist</a></li>
+<li><a href="#Advanced">Advanced Settings</a></li>
+</ul>
+<li><a href="#About">About</a></li>
+</ul>
+<li><a href="#Navigation">Menus: Navigation Bar</a></li>
+<ul>
+<li><a href="#Find Devices">Find Supported Devices</a></li>
+<li><a href="#Known Devices">Known Devices</a></li>
+<li><a href="#Manual">Enter Manual Data</a></li>
+<li><a href="#View PCD01">View PCD-01 or APDUs</a></li>
+<li><a href="#View Logcat">View/Send Logcat Logs - Bug Reports</a></li>
+<li><a href="#View Debug">View Debug Logs</a></li>
+<li><a href="#View Audit">View Audit Logs</a></li>
+<li><a href="#Android">Android Settings (Bluetooth)</a></li>
+<li><a href="#Logout">Logout</a></li>
+</ul>
+<li><a href="#USB">USB for 20601 Devices</a></li>
+<li><a href="#BT Devices">Handling Bluetooth Devices</a></li>
+<ul>
+<li><a href="#Pairing">Pairing</a></li>
+<li><a href="#Pairing Issues">Pairing Difficulties</a></li>
+</ul>
+<li><a href="#Troubleshooting">Troubleshooting</a></li>
+<ul>
+<li><a href="#Connection Issues">Connection Issues</a></li>
+<li><a href="#Discovery Issues">Discovery Issues</a></li>
+<li><a href="#Uploading Issues">Uploading Issues</a></li>
+</ul>
+</ul>
+</ul><p>
+
+<a name="Provisioning">
+<h3>Provisioning</h3>
+</a>
+This application supports LNI's automatic provisioning system. If you happen to be provisioned, the backend servers will be automatically configured, a patient will be selected, and the application transport engines will be running and waiting to receive measurement data. Data are automatically uploaded when the device disconnects. In theory, you should not need to do any setup at all.</p>If you are not provisioned, you will have to set a patient and configure the backend upload parameters yourself. Configuring the backends cannot be done until a patient is selected. If there is no patient, you will need to add one.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Un-Provisioned">
+<h3>If un-provisioned: <i>A patient must be selected for the app to function!</i></h3></a><p>
+When a patient is selected the transport engines start. There are some menu functions that will work before a patient is selected such as adding/updating the patients. Others, such as the upload options will not.<p>Once you have added one or more patients, use the search icon in the ToolBar to get the current list of patients (which may only contain yourself). When selected, the patient will appear in the title bar and the app will start searching for devices. You will note the dots in the upper left flashing<p>
+
+<ul>
+<li>The yellow circle flashes when seeking classic Bluetooth devices</li>
+<li>The blue circle flashes when seeking Bluetooth Low Energy devices</li>
+<li>The reddish circle flashes when searching activities are paused</li>
+<li>The larger green circle flashes when one or more devices are connected.</li>
+</ul><p>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Drivers">
+<h2>Drivers/Plugins</h2></a>
+Special drivers or plugins can be installed which will give this application support for additional devices. There are drivers (apks) written for GHS devices, MPM devices, FORA devices, Bodimetrics vital signs monitors, Kinsa thermometers, and Cycle power meters. These driver apks can be installed and uninstalled like any Android apk without the need to anything in the main application. The application polls once a minute for the installation of new drivers, so it might take up to 60 seconds before one gets a toast message stating a new proprietary driver has been installed.
+
+Some proprietary devices are supported natively as part of the application. &nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Discovery">
+<h2>Device Discovery, Connection, and Pairing</h2></a>
+In default mode, supported newly discovered devices will be popped up in a dialog box. If you select yes, the device will connect and the green circle will flash. Any pairing that is needed will happen automatically. If passkeys or confirmations are needed, the necessary dialogs will be popped up. Once paired, the next time the device is discovered, connection will happen automatically even after an app restart cycle.</p>If you select no, the device will be <i>blacklisted</i> and will not be re-discovered until the app is restarted or the discovery mode is changed. However, you can clear the list of blacklisted devices by tapping the overflow menu <b style="color:green;">settings/Advanced Settings/Clear blacklisted devices</b> option.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Displays">
+<h2>Measurement displays</h2></a>
+Measurements are displayed on the main screen, but to reduce clutter, the entire measurement may not be displayed. Tap the information icon <button class="button button5">&nbsp;&nbsp;<b>i</b>&nbsp;&nbsp;</button> to see the entire set of information including device data. Tap the delete <button class="button button1">&nbsp;<b>X</b>&nbsp;</button> icon to delete the measurement. When the measurement is uploaded to all destinations successfully, it will be cleared from the screen. If you want to see uploaded measurements, set the option to do so in the overflow menu <b style="color:green;">settings/Advanced Settings/Display Sent Measurements as well</b>. The sent measurements will be framed in a bright green. Only measurements for the selected patient are displayed. Switching the selected patient will switch the set of displayed measurements accordingly.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Uploads">
+<h2>Upload of Measurements</h2></a>
+When the device disconnects, the cloud icon will highlight with the text 'upload'. One taps the icon to start the upload. The icon flashes while data is being uploaded. One can set the upload to happen automatically. Once the upload is complete and successful, the measurement will no longer appear on the screen. If you want to see uploaded measurements, in the overflow menu <b style="color:green;">settings/Advanced Settings</b>, check the <b style="color:green;">Display Sent Measurements as well</b> box. Sent measurements will be displayed but framed in green.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a><p>
+
+<a name="Overflow">
+<h1>Overflow Menu</h1></a>
+<a name="Connection">
+<h2>BLE Connection Options</a></h2>
+On pre-BTLE Android platforms only the "Find then Connect" option will work!
+
+There are three sub-options. Note that all connections pair only when the peer device requests it. If the device does not request pairing, it will not pair even if the device supports pairing. All Continua devices are REQUIRED to use pairing thus it is only uncertified devices that will connect unsecure. The following supported BTLE devices are known to connect unpaired even though some support pairing:
+<ul>
+<li>Kinsa ear thermometer</li>
+<li>All IDT devices</li>
+<li>FORA Glucose meter and ear thermometer - there is a work around in the library that starts pairing on this device</li>
+</ul>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="AutoConnect">
+<h3>Connect automatically</h3></a>
+<b>This option is by far the easiest to use, but dangerous!.</b> The application will automatically connect to any device that it supports. The only interaction you will have will be the entering of pairing passkeys (pins) or pairing confirmations <i>if and only if the device requests it</i>.
+
+<b>CAUTION!!</b> You should NOT use this option unless <i>you know you are the only one using Bluetooth Personal Health Devices!</i> Otherwise, this application will steal a connection from someone else and you will get their data and you will have both angry and frustrated neighbors.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="ConfirmConnect">
+<h3>Connect after confirmation</h3></a>
+<b>This option is the application default.</b> The difference between this option and the automatic option is that you will receive a popup dialog with information about the newly discovered device. If you select 'YES', the connection procedure will continue as in the automatic case. Note that this request is only done once. Once accepted, it is added to a list of 'working' devices. If you select 'NO', the device will be added to a blacklist and you will not be asked again if it is re-discovered. <i>Note that this blacklist gets deleted if you switch options!</i>
+
+ This popup can come at any time and that is why you have to give the app a one-time permission to display this popup. If you do not give the app this permission and remain in this option, you will not be able to connect to any new devices.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="FindConnect">
+<h3>Find then Connect</h3></a>
+This option requires you to specifically start a discovery and select from a list of currently available devices that are supported by this app. <b>This option is recommended in Plugfests or in any environment where there are numerous Personal Health Devices.</b> When selected, the <i>Navigation</i> menu will contain a new option <b style="color:green;">Find Supported Devices</b>. A list of currently discovered devices that the application supports is displayed. You select the device you want and connect to it. From this point on, the connection procedure will continue as in the automatic case.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Delete">
+<h2>Delete all Measurements</a></h2>
+This option clears the screen of all measurements. You will be asked to confirm the action. Individual measurements can be deleted on the main screen.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Settings">
+<h2>Settings</h2></a>
+This option allows you to configure the PCD-01 and FHIR upload parameters, patients, and a set of advanced parameters. The options are:
+
+<ul>
+<li>Upload automatically</li>
+<li>Enable/disable PCD-01 uploads</li>
+<li>Configure PCD-01 server endpoints</li>
+<li>Enable/disable FHIR uploads</li>
+<li>Configure FHIR server endpoints</li>
+<li>Add/Edit Patients</li>
+<li>Enable/disable the APS</li>
+<li>Configure APS server endpoints</li>
+<li>Configure Whitelist</li>
+<li>Advanced Settings</li>
+</ul>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Upload">
+<h4>Upload automatically</h4></a>
+When selected (default is unselected) uploads to PCD-01 and FHIR will occur as soon as all connected devices disconnect. Otherwise you have to tap the upload 'cloud' icon to start the upload. If the upload fails, it will not be tried again automatically unless a new device connection takes place. Provisioned applications will have the upload set to automatic.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="PCD01">
+<h4>Enable/disable PCD-01 uploads</h4></a>
+This options allows you to selectively decide whether you want to upload as PCD-01. In combination with the FHIR upload option on can upload PCD-01, FHIR, both, or neither. If auto upload is selected, what ever options have been selected here will be auto uploaded.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="PCD01-Config">
+<h4>Configure PCD-01 server endpoints</h4></a>
+This option allow you to configure all the parameters one needs to upload to a PCD-01 server. You can have several configurations. You give each configuration a name and then you can later select it from a drop down list.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="FHIR">
+<h4>Enable/disable FHIR uploads</h4></a>
+This options allows you to selectively decide whether you want to upload as FHIR. In combination with the PCD-01 upload option on can upload PCD-01, FHIR, both, or neither. If auto upload is selected, what ever options have been selected here will be auto uploaded.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="FHIR-Config">
+<h4>Configure FHIR server endpoints</h4></a>
+This option allow you to configure all the parameters one needs to upload to a FHIR server, both a RESTFul FHIR server and a non-persisting FHIR server. You can have several configurations. You give each configuration a name and then you can later select it from a drop down list.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Patients">
+<h4>Add/Edit Patients</h4></a>
+This option allows you to edit your existing list of patients and/or add and remove patients. The interface looks the same as the PCD-01 and FHIR configuration. However, the displayed patient is NOT the current patient. All this option does is allow you to edit your patient database. To change the current patient, one must return to the main page and select the current patient from the list.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="APS">
+<h4>Enable/disable the APS</h4></a>
+Turn off/on the Authenticated Persistent Sessions (APS) connection. An APS allows one to configure the app remotely from the APS server backend. Important on a headless PHG but less so on this PHG which has an user interface. This option will set to 'on' if you are provisioned. If you are not provisioned, you can ignore the APS.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+<a name="APS-Config">
+<h4>Configure APS server endpoints</h4></a>
+This option allows you to edit the APS (Authenticated Persistent Sessions) parameters. This feature is an advanced topic and if you don't know what it is don't worry about it. LNI-Provisioned applications will have these fields set and it allows you to configure and monitor the PHG through the backend.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Whitelist">
+<h4>Configure Whitelist</h4></a>
+This option allows you to set up a whitelist. 'Whitelisting' means allowing only certain devices to connect. Devices are identified using their Bluetooth address. There is an overflow menu option that automatically adds all currently known devices to the whitelist. It might be easier to set up a whitelist using this option.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Advanced">
+<h4>Advanced Settings</h4></a>
+This menu contain a list of settings and actions. A 'setting' would be like 'delete stored data after upload' and an action would be 'Clear Stored 20601 Configurations'. The list of options are:
+<ul>
+<li>Delete stored data after upload</li><i>Selection of this option causes H@H to delete the stored data after uploading it. Note that the device may not allow it or support it.</i>
+<li>Filter continuous pulse ox data</li>
+<li>Filter fast-modality pulse ox data</li>
+<li>Filter slow-modality pulse ox data</li>
+<li>Filter duplicate data from Beurer</li>
+<li>Make 20601 config synchronous</li>
+<li>Save PCD-01 to a file</li>
+<li>Save APDU data to file</li>
+<li>Save FHIR bundles to file (not yet implemented)</li>
+<li>Display Sent Measurements as well</li><i>Selection of this option shows uploaded measurements framed in green. Normally uploaded measurements are no longer visible.</i>
+<li>Use BTLE advertisement filters</li><i>Advanced! When selected (default) only devices supported by H@H are discovered. When unchecked, all devices are discovered. May result in a flood of discovery events. Best used with the Find then Connect BLE Connection option.</i>
+<li>Display basic measurements only</li><i>When selected (default) only a limited number of measurements are displayed to reduce clutter. When unselected, all measurement types are displayed such as battery level and context measurements.</i>
+<li>Reset FHIR duplicate data filters</li>
+<li>Clear blacklisted devices</li>
+<li>Clear stored 20601 configurations (not yet implemented)</li>
+<li>Restart the APS</li>
+</ul>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="About">
+<h2>About</h2></a>
+Classic about dialog box with app version number, Bluetooth and MAC addresses (if available).&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Navigation">
+<h1>Navigation Menu</h1></a>
+Following Android design suggestions, the options in the Navigation menu bring you to a different page or activity and do NOT do configuring or settings.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Find Devices">
+<h2>Find Supported Devices</h2></a>
+This option is only present if the 'Find then Connect' option in the BLE Connection Options has been selected. It is similar to the standard Android Bluetooth settings screen except only supported Bluetooth devices are displayed in a list. In addition there is more information about the device. You can then select which device you want to connect to. HDP devices will have the option 'PAIR' instead of connect as on Android HDP devices must pair and then disconnect before being able to reconnect and send data. Reconnection will occur automatically.<p>
+If you know you are looking for just classic or bluetooth low energy devices you can tap the 'Favor <i>x</i>' icon to cause the discovery to spend more time on that type of device.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Known Devices">
+<h2>Known Devices</h2></a>
+Gives a list of devices that are known by this app. The 'FORGET' button removes the device from the 'known devices' list. If the device is also paired, it will be unpaired. HDP devices will also have a 'connect' option. That option is for passive HDP devices which should be outlawed. Do not use unless you really know what you are doing. The list may be different than the list displayed in the standard Android Bluetooth Settings menu as the pairing occurred outside of this app. This inconsistency may cause this app to popup discovery dialogs for an already paired device but operations should still be able to continue normally.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Manual">
+<h2>Enter Manual Data</h2></a>
+This option allows you to enter measurements in lieu of a real device. Five device types are supported; Blood Pressure, Glucose, Pulse Ox, Weight Scale, and Thermometer.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="View PCD01">
+<h2>View PCD01 or APDUs</h2></a>
+This option allows you view sent PCD-01 messages and their responses or the sequence of APDUs. APDUS are only generated by HDP/USB devices. The option to save these messages must be turned on. Do so in the Settings/Advanced menu.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="View Logcat">
+<h2>View/Send Logcat Logs</h2></a>
+This option allows one to view Android's logcat but more importantly it allows reporting of bugs to a support email address. This activity has its own overflow menu for logcat viewing options. It should be stated that viewing logcat here is not nearly as complete as viewing it in Android Studio.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="View Debug">
+<h2>View Debug Logs</h2></a>
+This option allows you to view messages sent by the application. Good for debugging. The log is saved between power cycles and simply gets bigger and bigger. You should clear it every once and a while.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="View Audit">
+<h2>View Audit logs</h2></a>
+This option allows you to view the sequence of measurements. The log shows the received measurements and the result of sending the measurement as FHIR or PCD-01. Each measurement is labeled for easier tracking. The log is saved between power cycles and simply gets bigger and bigger. You should clear it every once and a while.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Android">
+<h2>Android Settings</h2></a>
+This option brings one to the standard Android Bluetooth settings screen. It should not be used except for debugging purposes, in particular if you can't discover BLE devices for some reason.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Logout">
+<h2>Logout</h2></a>
+Exits the app. So does the standard Android 'back' icon. You will be asked for confirmation and warned of any measurements that are pending for upload. Currently, all unsent measurements are deleted upon app exit. That may change in the production release.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="USB">
+<h1>USB</h1></a>
+If the Android supports USB host mode, this app will support IEEE 20601 devices that support USB PHDC transports. You will need a USB On the Go cable.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="BT Devices">
+<h1>Handling Bluetooth Devices</h1></a>
+
+<a name="Pairing">
+<h3>Pairing</h3></a> Pairing is not initiated by the user but will happen on demand by the remote device. The user may have to respond to confirmation or passkey/pin entry dialogs. HDP devices need to disconnect after pairing before measurements can be sent (this is an Android limitation; but reconnects are automatic). BLE and SPP devices can continue on to send new measurements but some BLE devices have to disconnect first (such as A&D devices).&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Pairing Issues">
+<h3>Pairing Difficulties</h3></a>
+
+<h4>Different Approaches</h4> 
+<h4>Unpairing</h4>
+If you are having problems connecting to a device, it may be paired with another gateway and require that you remove that pairing (A&D and Roche devices). Some devices will simply fail the first attempt and autoclear their pairing data and succeed on the second attempt (Nonin BLE devices).
+<h4>Inconsistent pairing</h4> While pairing requires two endpoints, unpairing does not. Unpairing happens when you 'forget' a pairable device. The most difficulty repairing seems to arise when the device was once paired with this app and then has had it cleared, or this app was paired with a given device and then cleared (forgotten). In this case peer 1 expects peer 2 to be paired with it so peer 1 expects encryption while peer 2 expects pairing. How a given device resolves this conflict is different on every device (unfortunately) and may require multiple attempts, associated with a share of frustration.<p>
+
+Most of the troubles you are going to have is with Bluetooth, especially Bluetooth Low Energy. For a given Bluetooth Low Energy device, functionality on the same platform with different OS versions, and on different platforms with the same OS version will be different. This inconsistency is due to the different implementations of (and errors in) the BLE stack by Android manufacturers and the inconsistent and often poor implementation of the BLE stack on the devices.&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a><p>
+
+<a name="Troubleshooting">
+<h1>Troubleshooting</h1></a>
+
+<a name="Connection Issues">
+<h2>Can not connect to a discovered device</h2></a>
+There are countless reasons for why you may not be able to connect to a PHD health device. Here are some more common reasons and possible solutions:
+
+<li>Failing batteries. More common than you think. PHD may 'work' but doesn't have the muscle to send.</li>
+<li>Another gateway application is running and has 'stolen' (connected) to the PHD</li>
+  <ol>
+    This problem <b>only</b> arises if you or someone else nearby is running another gateway that works with your PHD. A PHD can only connect to one gateway at a time and whichever gateway gets it first wins. Turn off the competing gateway.
+  </ol>
+<li>The PHD is paired with another gateway and needs to be unpaired</li>
+  <ol>
+    Some PHDs require the user to set it into a pairing mode to work with a new gateway. If such a PHD is paired with another gateway, it will not work with Health@Home unless you set up the PHD to create a new pairing. A&D, Omron, and Roche PHDs work in this manner.
+  </ol>
+<li>There is another gateway app running on your Android</li>
+  <ol>
+    Having two gateways running on the same Android is recipe for complete disaster. A common source for a second gateway is that you have installed the manufacturer's application. These applications are designed specifically for the manufacturer's PHDs. Some of these applications start automatically on power up. The only sure solution is to reboot the Android <i>after assuring that the competing application does not start</i>. The latter may require that you uninstall the manufacturer's application.
+  </ol>
+<li>There is inconsistent pairing between Health@Home and the PHD.</li>
+  <ol>
+    Health@Home thinks it is paired but the PHD does not, or the PHD thinks it is paired but Health@Home does not. This situation easily arises as 'unpairing' is a one-sided operation. It will also happen if you have paired your PHD to work with another gateway after working with Health@Home<p>
+	Try and unpair both sides if possible. It may not be possible to unpair the PHD manually. Resetting the PHD pairing may just require several connection attempts depending upon PHD. The Nonin BTLE devices work this way.
+  </ol>
+<li>Health@Home does not reconnect after successfully connecting before.</li>
+  <ol>
+    We assume here that you have connected, then disconnected and then the reconnection fails. You have not unpaired the PHD or used the PHD with another gateway. If the PHD does not save bonding information but only pairs Health@Home will not reconnect. Such PHDs will require re-pairing every time.
+  </ol>
+<li>The PHD is 'incompatible' with your Android</li>
+  <ol>
+    This situation is one no one wants as there is no solution. It may show itself only when reconnecting. The fault can lie on either side because there are bugs in the Bluetooth stack on the PHD and the Android. Check on line to see what platforms the PHD is known to work with. That information may not be available. Otherwise, the only way one can truly know if there is a compatibility issue is to try on another Android platform or version. We have found some workaounds for some PHDs on certain platforms and have implemented them where known. There could also be bugs in Health@Home. Use the <b style="color:green;">View/Send Logcat logs</b> after attempting to connect with the given PHD to send LNI a bug report.
+  </ol>
+
+<li>Health@Home has crashed and left the background scanner running</li>
+  <ol>
+    Though we have tried everything to assure a crash does not leave the scanner running, we do not always succeed. That may result in two scanners running. The only solution (besides reboot) is to navigate to the Android Settings app where one can uninstall Health@Home. Select the option to 'Force Stop' and then restart Health@Home.
+  </ol>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Discovery Issues">
+<h2>Can not discover a BLE device</h2></a>
+<li>You have not made the PHD discoverable</li>
+  <ol>
+    Every PHD is different. Some only require that you take a measurement. Others may require a setup or a special action, especially the first time.
+  </ol>
+<li>You have not given Health@Home fine location permission (applies to BLE devices only)</li>
+  <ol>
+    The only solution is to give Health@Home the necessary permissions. Navigate to the Android Settings application and find the option where one can uninstall Health@Home.  Do not uninstall Health@Home but clear Health@Home's data. Unfortunately this action will clear any configurations you have made. Restart Health@Home and be sure to give it all permissions. On Android 10+ 'allow all the time' permission is needed. On Android 11 setting the 'allow all the time' permission requires selecting the link that takes you to the Android settings app. Giving permissions in Android 11 is painfully complex. If you do not give Health@Home this level of permission, Android will kill the Bluetooth Service and you will not know.
+  </ol>
+<li>You have given Health@Home fine location permission but still PHD is not discovered</li>
+  <ol>
+    The permission has been overridden by the Android System or the installation of some other app. Navigate to the Location permissions settings in the Android Settings application and allow locations. Unfortunately, finding this option in the Android Settings app is different on every platform.<p>A good test that location permissions are the problem is to navigate to the Android Settings Menu and try and discover your device using that application. The Android settings application is a system app and requires no permissions. If you see the device there, <i>location permissions have been somehow disabled for Health@Home</i>.
+  </ol>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+<a name="Uploading Issues">
+<h2>Uploading Issues</h2></a>
+95% percent of uploading issues result from misconfiguration. The user generally has to set up an account with the server and then enter all the correct parameters into Health@Home's PCD-01 and FHIR upload configuration menus. These parameters include having all the addresses (URLs) passwords, user names, oAuth credentials, etc. that are needed to work with the back end. It is easy to make a spelling mistake and Android can make that worse by auto-correcting spelling, in particular URLs where spaces get auto-inserted and text strings modified to what Android thinks you meant. One spelling mistake anywhere will cause an upload error. In addition, the patient associated with the upload needs to be properly configured including the patient identifiers and other related codes.
+
+The error prone effort of configuring uploads is the reason 'provisioning' is supported.
+
+Other issues could be
+<li>Wifi not configured or enabled or in Airplane mode</li>
+<li>There is an error in either the PCD-01 message or FHIR bundle or an error in the server's decoders that cause the upload to fail.</li>
+  <ol>
+    If the upload of a PCD-01 message or FHIR bundle fails, further uploads will not be possible. The same message will get resent and re-fail. If the error is in the upload data or the server's inability to handle the data, the only solution is to delete the measurement that causes the error. 
+  </ol>
+<li>In PCD-01 uploads one may get an error if the clocks of the Android and the back end server are out of sync by more than 5 minutes.</li>
+  <ol>
+    This error should be rare today but the only solution is to be sure both clocks are UTC synchronized. The problem is typically that the Android's Date and Time in the Android Settings app has NOT been configured to automatically update the date, time and time zone. 
+  </ol>&nbsp;&nbsp;<a href="#Topics"><button class="button button2">&nbsp;Back&nbsp;To&nbsp;Topics&nbsp;</button></a>
+
+</body>
+</html>
+
+
