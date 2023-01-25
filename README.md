@@ -679,16 +679,12 @@ The first record with header flags bit 7 set.
 | Command | flags | Length of PDU | Time stamp | Supplemental types | reference | duration |
 | --- | --- | --- | --- | --- | --- | --- |
 | Person id | AVAs | Group id | Number of measurements |
- |
- |
- |
+| --- | --- | --- | --- |
 
 | type | length | Measurement flags | id | Measurement Value | Supplemental Types |
 | --- | --- | --- | --- | --- | --- |
 | reference | duration | AVAs |
- |
- |
- |
+| --- | --- | --- |
 
 Measurement values:
 
@@ -788,7 +784,7 @@ Below is an example advertisement for a MPM pulse oximeter:
 
 [03 03 90 F9] // Service UUID MPM: 0xF990
 
-[06 16 90 F9 04 10 01 // Service data MPM UUID: [0xF990] Specialization Pulse Oximeter: [0x1004] and pairing required [0x01]
+[07 16 90 F9 01 04 10 01 // Service data MPM UUID: [0xF990] one [0x01] Specialization Pulse Oximeter: [0x1004] and pairing required [0x01]
 
 // pairing required
 
