@@ -889,6 +889,13 @@ static void createCpResponse(uint16_t error, uint16_t *response)
         cpResponse[4] = (*response & 0xFF);
         cpResponse[5] = ((*response >> 8) & 0xFF);
         global_send.data_length = 6;
+        #if (USES_STORED_DATA == 1)
+            if (global_send.current_command == COMMAND_GET_NUMBER_OF_STORED_RECORDS)
+            {
+                populate_epoch_range_of_stored_data(&cpResponse[6]);
+            }
+            global_send.data_length = 18;
+        #endif
     }
     global_send.data = cpResponse;
     global_send.offset = 0;
@@ -1072,6 +1079,20 @@ static void command_handler(void * p_context)
         #else
             createCpResponse(METCP_COMMAND_UNSUPPORTED, NULL);
         #endif
+        send_flag = true;
+        break;
+
+    case COMMAND_GET_STORED_RECORDS_BY_INDEX:
+        stored_data_done_sent = false;
+        print_command("Get Stored Records by index");
+        createCpResponse(METCP_COMMAND_UNSUPPORTED, NULL);
+        send_flag = true;
+        break;
+    
+    case COMMAND_GET_STORED_RECORDS_BY_TIME:
+        stored_data_done_sent = false;
+        print_command("Get Stored Records by index");
+        createCpResponse(METCP_COMMAND_UNSUPPORTED, NULL);
         send_flag = true;
         break;
 

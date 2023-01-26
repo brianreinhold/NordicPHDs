@@ -10,12 +10,12 @@
  * selected at a given time. Setting more than one will cause a compile error. These specializations
  * follow the model (their so-called DIM) specified in the IEEE specialization standards.
  */
-#define BP_CUFF 1
+#define BP_CUFF 0
 #define PULSE_OX 0
-#define GLUCOSE 0           // Be sure USES_STORED_DATA is set to 1 or nothing will happen
+#define GLUCOSE 0           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
 #define HEART_RATE 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
 #define SPIROMETER 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
-#define SCALE 0
+#define SCALE 1
 #define THERMOMETER 0
 
 // Options:
@@ -32,6 +32,7 @@
                            // that this data takes up a lot of space in the code. Well, the instantaneous flow data stream takes up a
                            // lot of space! In the case of a real spirometer the data would come from the sensor turbine and there
                            // would be no need to have this data in the program code.
+                           // If enabled be SURE to USES_TIMESTAMPS is also enabled.
 
 //#define USES_TIMESTAMP 1  This is placed in MetControlStructs.h instead of here in order to refer only to MetControlStructs.h
 //                          in the configMetEncoder.c file.
@@ -274,6 +275,7 @@ void sendStoredSpecializationMsmts(unsigned short stored_count);
 void deleteStoredSpecializationMsmts(void);
 bool encodeSpecializationMsmts(s_MsmtData *msmt);
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp);
+void populate_epoch_range_of_stored_data(unsigned char *epoch_range);
 void setNotOnCurrentTimeline(unsigned long long newCount);
 void cleanUpSpecializations(void);
 

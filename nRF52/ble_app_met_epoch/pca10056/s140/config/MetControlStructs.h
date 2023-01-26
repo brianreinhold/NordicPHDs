@@ -30,18 +30,31 @@
                                                 // If the value of the time sync is TIME_SYNC_NONE the time has not be set.
                                                 
 #define COMMAND_GET_NUMBER_OF_STORED_RECORDS 0x000E // This command asks the PHD for the number of stored records. A record is
-                                                    // a measurement group. A PHD must always respond to this command whether or
-                                                    // not it stores data.
+                                                    // a measurement group. The PHD returns the number of records and the
+                                                    // epoch time of the first record followed by the epoch time of the last
+                                                    // record, even if it does not support getting records by epoch time.
+                                                    // A PHD can respond to this command with unsupported if it does not
+                                                    // perisistently store data.
                                                     
 #define COMMAND_GET_ALL_STORED_RECORDS 0x000F       // This command requests all stored records. The PHG may skip this command if
                                                     // the number of stored records is 0 OR the PHG does not want the data.
+                                                    // A PHD can respond to this command with unsupported.
+
+#define COMMAND_GET_STORED_RECORDS_BY_INDEX 0x0010  // This command requests all stored records by index. The first record is index
+                                                    // 0 and the last record index is the number of stored records - 1.
+                                                    // A PHD can respond to this command with unsupported.
+#define COMMAND_GET_STORED_RECORDS_BY_TIME 0x0011   // This command requests all stored records by time epoch. The epoch time of the
+                                                    // first and last records is returned in the get number of stored records command
+                                                    // The epoch is the six-byte value in the resolution and time type used by the server.
+                                                    // A PHD can respond to this command with unsupported.
                                                     
-#define COMMAND_DELETE_ALL_STORED_RECORDS 0x0010    // The PHG may request deletion of the stored data. The PHD may not support this
+#define COMMAND_DELETE_ALL_STORED_RECORDS 0x0012    // The PHG may request deletion of the stored data. The PHD may not support this
                                                     // command.
+                                                    // A PHD can respond to this command with unsupported.
                                                     
-#define COMMAND_SEND_LIVE_DATA 0x0011               // The PHG sends this command to request live data. Once this command is sent, the
+#define COMMAND_SEND_LIVE_DATA 0x0013               // The PHG sends this command to request live data. Once this command is sent, the
                                                     // PHG shall not request any of the previous commands. At the moment no command has
-                                                    // been defined for stopping the live data.
+                                                    // been defined for stopping the live data. However, a PHG can disable the characteristic.
 #define COMMAND_PROPRIETARY 0xFFFF
 
 // System Info flags

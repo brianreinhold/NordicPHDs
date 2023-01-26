@@ -64,6 +64,17 @@ int fourByteEncode(unsigned char* msmtBuf, int index, unsigned long value)
     return index;
 }
 
+int sixByteEncode(unsigned char* msmtBuf, int index, unsigned long long value)
+{
+    int m;
+    for (m = 0; m < 6; m++)
+    {
+        msmtBuf[index++] = (unsigned char)(value & 0xFF);
+        value = (value >> 8);
+    }
+    return index;
+}
+
 bool hexToLittleEndianByte(char* hexString, unsigned char* byteArray)
 {
 

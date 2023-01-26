@@ -6,21 +6,46 @@
 #include "MetControlStructs.h"
 
                             // Assure USES_TIMESTAMP is set to 1 in MetControlStructs.h unless noted
+/* Here is where we select which device specialization we want. Only one of the specialization can be
+ * selected at a given time. Setting more than one will cause a compile error. These specializations
+ * follow the model (their so-called DIM) specified in the IEEE specialization standards.
+ */
 #define BP_CUFF 0
 #define PULSE_OX 0
-#define GLUCOSE 0           // Be sure USES_STORED_DATA is set to 1 or nothing will happen
-#define HEART_RATE 0        // USES_STORED_DATA can be set to 0
-#define SPIROMETER 1        // USES_STORED_DATA can be set to 0
-#define SCALE 0
+#define GLUCOSE 0           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
+#define HEART_RATE 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
+#define SPIROMETER 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
+#define SCALE 1
 #define THERMOMETER 0
+
+// Options:
 #define NUMBER_OF_STORED_MSMTS 30
 #define SUPPORT_PAIRING 1  // 1: requires pairing/bonding 0: no pairing or bonding
-                           // Set to 1 to skip
-#define USES_STORED_DATA 1
 
-#define USE_DK 1        // Set NRF_LOG_ENABLED to 0 when DK is 0. The idea is either DK or nRF52840 dongle
-                        // Board in preprocessor needs to be changed from BOARD_PCA10056 (DK) to BOARD_PCA10059 (dongle)
+#define USES_STORED_DATA 1 // Two of the specializations (heart rate and spirometer) in this implementation do not support stored
+                           // data. You could enhance this code such that they do. The reason the heart rate monitor does not
+                           // support stored data is that the BT-SIG profile matching this specialization does not support stored
+                           // data. It would be easy to add that feature if desired even for the case of generated fake data.
+                           // The spirometer does not support stored data because I had no way to generate fake spirometer data.
+                           // All 'fake' spirometer measurements in this case are taken from a single maneuver from a real
+                           // spirometer which means the flow data and actual values computed from it make sense. The down side is
+                           // that this data takes up a lot of space in the code. Well, the instantaneous flow data stream takes up a
+                           // lot of space! In the case of a real spirometer the data would come from the sensor turbine and there
+                           // would be no need to have this data in the program code.
+                           // If enabled be SURE to USES_TIMESTAMPS is also enabled.
 
+//#define USES_TIMESTAMP 1  This is placed in MetControlStructs.h instead of here in order to refer only to MetControlStructs.h
+//                          in the configMetEncoder.c file.
+
+#define USE_DK 1        // Set NRF_LOG_ENABLED to 0 when DK is 0. The idea is either the Development Kit (DK) or nRF52840 dongle
+                        // is to be flashed. Board in preprocessor needs to be changed from BOARD_PCA10056 (DK) to BOARD_PCA10059 (dongle)
+                        // Note that one cannot flash the dongle from the IDE. You have to create the HEX file and use the nRF Connect
+                        // programmer tool to flash the dongle.
+
+// Special case for optimized sending. These values
+// are used internally and not set by the user. They should probably be moved to main.c
+// as that is the only place they are used.
+// To use optimzied settings one defines the SEND_OPTIMIZED preprocesser to 1 in the individual specializations case below.
 #define CONT_NONE 0
 #define CONT_RECORD_SEND 1
 #define CONT_RECORD_DONE 2
@@ -64,6 +89,8 @@ extern unsigned short msmt_id;
     // We define this structure to carry the measurements our blood pressure cuff can generate. The contents and name of the
     // structure is up to the application. If your device doesnt send status events, there is no reason to include them in your
     // structure. Some BP cuffs do not report a mean and therefore would not include that either.
+    // The name of the structure does not have'Bp' in it because we want to use the same name for all specialization data structures,
+    // allowing one to change specializations just by setting a define statement above.
     typedef struct
     {
         bool hasTimeStamp;
@@ -72,7 +99,7 @@ extern unsigned short msmt_id;
         unsigned short diastolic;
         unsigned short mean;
         unsigned short pulseRate;               // The pulse rate is also only to whole integer values
-        bool hasStatus;
+        bool hasStatus;                         // The fake data generator randomly sets a status event and some of the following conditions below
         unsigned short status_movement;         // The rest of the values are the status values as specified by the IEEE ii073 10407 BP specialization.
         unsigned short status_cuff_too_loose;   // The values are given by their MDer values, so the status_cuff_too_loose value when set is 0x4000 which
                                                 // is given by BP_STATUS_CUFF_TOO_LOOSE above.
@@ -127,12 +154,16 @@ extern unsigned short msmt_id;
 #if (SPIROMETER == 1)
     #define SEND_OPTIMIZED 0
     #define LIVE_COUNT_MAX 8
+    
+    // This structure has no measurement values entries in it because all the 'fake'
+    // data is hard coded and not generated.
     typedef struct
     {
         bool hasTimeStamp;
         s_MetTime sMetTime;
     }s_MsmtData;
-    
+
+/*
     typedef struct
     {
         bool hasTimeStamp;
@@ -184,20 +215,34 @@ extern unsigned short msmt_id;
         unsigned long fvcAtsGrade;      // MDC code
     }s_SpiroSummary;
 
-    typedef struct  // This is the only structure used
+
+    typedef struct
     {
         bool hasTimeStamp;
         s_MetTime sMetTime;
         unsigned long sessionType;      // MDC code
     }s_SpiroSession;
 
-    
     typedef struct
     {
         bool hasTimeStamp;
         s_MetTime sMetTime;
         unsigned long sub_sessionType;      // MDC code
     }s_SpiroSubSession;
+    
+    // If the data were coming from actual sensors the s_MsmtData structure would
+    // be something like the following:
+        typedef struct
+    {
+        bool hasTimeStamp;
+        s_MetTime sMetTime;
+        s_SpiroSession sSession;
+        s_SpiroSettings sSettings;
+        s_SpiroSubSession sManeuverSession;
+        s_SpiroStream sStream;
+        s_MsmtSpiroManeuv sManuerverData
+    }s_MsmtData;
+*/
 
 #endif
 #if (SCALE == 1)
@@ -224,12 +269,13 @@ extern unsigned short msmt_id;
 
 unsigned char *getBtAddress(void);
 void configureSpecializations(void);
-void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long timeStamp, unsigned short numberOfStoredMsmtGroups);
+bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long timeStamp, unsigned short numberOfStoredMsmtGroups);
 void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, long long diff, unsigned short timeSync);
 void sendStoredSpecializationMsmts(unsigned short stored_count);
 void deleteStoredSpecializationMsmts(void);
 bool encodeSpecializationMsmts(s_MsmtData *msmt);
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp);
+void populate_epoch_range_of_stored_data(unsigned char *epoch_range);
 void setNotOnCurrentTimeline(unsigned long long newCount);
 void cleanUpSpecializations(void);
 

@@ -93,7 +93,7 @@ The exchange between the gateway client and PHD is steered from the client and i
 - Request number of Stored Records if desired
   - PHD sends number of stored records\*
   - PHD indicates it is done with the task (\*the number is sent with the done indication)
-- Request transfer of all Stored Records if desired
+- Request transfer of all Stored Records if desired (other options are in the works)
   - For each stored record
     - PHD sends stored record
     - PHD indicates it is done with the record
@@ -571,18 +571,20 @@ In this trial MPM implementation the commands are specified as the following 16-
 
 - COMMAND\_GET\_SYS\_INFO_ = 0x000A
 - COMMAND\_GET\_CONFIG\_INFO_ = 0x000B
-- COMMAND\_GET\_CURRENT\_TIME_ = 0x000C
+- COMMAND\_GET\_CURRENT\_TIME = 0x000C
  
 - COMMAND\_SET\_CURRENT\_TIME_ = 0x000D [time 10 bytes]
-- COMMAND\_GET\_NUMBER\_OF\_STORED\_RECORDS_ = 0x000E
-- COMMAND\_GET\_ALL\_STORED\_RECORDS_ = 0x000F
-- COMMAND\_DELETE\_ALL\_STORED\_RECORDS_ = 0x0010
-- COMMAND\_SEND\_LIVE\_DATA_ = 0x0011
+- COMMAND\_GET\_NUMBER\_OF\_STORED\_RECORDS = 0x000E
+- COMMAND\_GET\_ALL\_STORED\_RECORDS = 0x000F
+- COMMAND\_GET\_STORED\_RECORDS_BY\INDEX = 0x0010
+- COMMAND\_GET\_STORED\_RECORDS_BY\TIME = 0x0011
+- COMMAND\_DELETE\_ALL\_STORED\_RECORDS_ = 0x0012
+- COMMAND\_SEND\_LIVE\_DATA_ = 0x0013
 - COMMAND\_PROPRIETARY_ = 0xFFFF [parameters]
 
 After the task is done, the PHD sends a packet that consists of the 16-bit command followed by the 16-bit result followed by any parameters [command][response][parameters].
 
-Only the *get number of stored records* command has a parameter.
+Only the *get number of stored records* command has parameters - it returns the number of stored records and the epoch of the first and last entries.
 
 ## Command Results
 
@@ -596,7 +598,7 @@ The results are specified as the following 16-bit integers:
 
 ## Commands Response Parameters
 
-The get number of stored records command is two bytes containing the number of stored records in little endian format.
+The get number of stored records command is two bytes containing the number of stored records followed by the epoch of the first and last records in little endian format. If there are no stored records the epoch values are both zero. If there is only one record the two epochs have the same value.
 
 # **IEEE Mder FLOATs**
 

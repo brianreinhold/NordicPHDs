@@ -5,19 +5,19 @@
 
 
 /*
- * All this library does is create templates (byte arrays) that one sends sends to the peer. 
+ * All this library does is create templates (byte arrays) that one sends to the peer. 
  * There are three differnt templates
  *    Current Time Info template
  *    System Info template
  *    Measurements template
  * The templates are defined in the Metric Packet Model Implementation Guide. The Current Time Info and System Info templates are
  * easy. The System Info template is easiest because it is static. You create it once and its good for the lifetime of the device.
- * The idea of the templates is that the device is liley to only do a certain set of things and that set of things is fixed. A thermometer is
+ * The idea of the templates is that the device is likely to only do a certain set of things and that set of things is fixed. A thermometer is
  * not going to be taking BP measurements. The capabilities are also likely to remain the dame. So the static information is populated
  * ahead of time and the dynamic information is populated when data from the sensor arrives. 
  * So the library creates the templates based upon what the application supports. That's what all the config methods are for. When the
  * library generates the templates it keeps track of where in the template the values and other dynamic fields go. The application can call
- * the update methods to populate these values. Once all the values from the sensor data are filled in, the template can be notified
+ * the update methods to populate these values. Once all the values from the sensor data are filled in, the template can be notified/indicated
  * over the characteristic.
  *
  * There might be some cases where the application needs to create its own update methods. For example, the measurement type is
@@ -36,7 +36,7 @@
         System Info Packet:
     command | flags | length | System-id | [count | Specialization-code-n] | [length | Manufacturer-Name] |
         [length | Model-number] | Regulation-status | [length | Serial-number] | [length  firmware] | 
-        [length | software] | [length | hardware] | AVAs]
+        [length | software] | [length | hardware] | length | UDI label | length | UDI Device Identifier | length | UDI issuer | length | UDI auth | AVAs]
 
         Measurements Packet:
     command | header | Measurement-1 | Measurement-2 | … | Measurement-n
@@ -87,20 +87,23 @@
                                  true,              // If time stamps are being used set to true
                                  2,                 // The number of measurements in the group, in this case 2, blood pressure and pulse rate
                                  group_id++);       // The group id. This value is only used for optimization should you choose to use optimization
-                                                    // but it needs to be valued and unique for the group in a connection. There is a maximum of 256 groups.
+                                                    // but it needs to be valued and unique for the group in a connection. There is a maximum of 256 groups
+                                                    // if you are using optimization. Otherwise the value is not used.
 
  *    Now we need to add measurements to that group. The blood pressure is more complicated because it is a compound or a vector. The systolic,
- *    diastolic, and mean components are treated as parts of a single measurement like the x, y, and z components of an acceleration. Thus before
- *    we can create this measurement we need to specify what our compound measurement contains. That is done by populating an array of s_Compound
+ *    diastolic, and mean components are treated as parts of a single measurement like the x, y, and z components of an acceleration. The reason
+ *    for treating them as a vector was probably for efficiency and it now has become the norm and part of the BP standards. One could choose to
+ *    send them as individal simple numerics (and some HL7 FHIR implementations treat them that way) and link them together. But now we follow the
+ *    standard. To create this measurement we need to specify what our compound measurement contains. That is done by populating an array of s_Compound
  *    structs as follows:
         s_Compound compounds[3];            // We want three; one each for the systolic, diastolic, and mean components:
         compounds[0].subType = MDC_PRESS_BLD_NONINV_SYS;    // This is a 32-bit unsigned integer which gives the MDC code for systolic blood pressure
         compounds[1].subType = MDC_PRESS_BLD_NONINV_DIA;
         compounds[2].subType = MDC_PRESS_BLD_NONINV_MEAN;
- *    This structure also has elements for the value but those are not uses because values will be populated when data is received from the sensor.
+ *    This structure also has elements for the value but those are not set yet because values will be populated when data is received from the sensor.
  *    Yes it is understood that you have to know what MDC codes are and that is not always a trivial task. Included with this library is a file nomenclature.h
  *    which contains a bunch of MDC codes that will cover 99% of the possible PHDs one can create. There is also an on line tool called the NIST Rosetta
- *    which can also help though at this time it is still a work in progress and the nomenclature.h file is your better bet.
+ *    which can help though at this time it is still a work in progress and the nomenclature.h file is your better bet.
  *    The other element of this structure is the value. That we will set when we get data from the sensor. The subTypes can be set once as they will
  *    never change. So once we decide what is in our compound measurement, we create the compound measurement and then add it to our group:
         s_MetMsmt *bp = NULL;               // Initialize this pointer to NULL!
@@ -109,9 +112,9 @@
                                            MDC_PRESS_BLD_NONINV,    // This is the 32-bit MDC code that expresses what the overall compound measurement
                                                                     // is. In this case it is 'non-invasive blood pressure'.
                                            true,                    // 'true' If the values are encoded as two-byte Mder Floats versus 4-byte MderFloats
-                                           MDC_DIM_MMHG,            // The units of the measurement. Complex compound are compounds where the units are
+                                           MDC_DIM_MMHG,            // The units of the measurement. Complex compounds are compounds where the units are
                                                                     // different for each of the sub types. The s_Compound structure has sub units in it
-                                                                    // but they are igored in this case since BP is not a complex compound. There is a
+                                                                    // but they are ignored in this case since BP is not a complex compound. There is a
                                                                     // different method to call should you want complex compounds.
                                            3,                       // The number of elements in the compound. In this case, there are three.
                                            compounds);              // A pointer to the array of s_Compound structs.
@@ -123,13 +126,13 @@
  *    the supplemental types can be common to all measurements (part of the header) or just a single measurement. To add the supplemental types values we call 
  *    update methods on the data array once created. This allows us to add the supplemental types statically (just once and use always) or dynamically as data
  *    is received. In any case, we are going to add just one supplemental type to the BP measurement, not the header. We do that by calling
- *      setMetMsmtSupplementalTypes(&bp, 1).
+ *      setMetMsmtSupplementalTypes(&bp, 1). The '1' tells the library how many supplemental types we are going to have.
       This setting will eventually create space in the final data array to put one supplemental types value.
  *    Now we add this populated s_MetMsmt struct to the group:
         bp_index = addMetMsmtToGroup(bp,            // A pointer to the s_MetMsmt struct we want to add - in this case the bp
                                      &msmtGroup);   // A pointer to the measurement group we want to add the measurement to.
  *    Note that the above method returns a very critical bp_index. You have to keep this value as it tells where in the measurement group this particular
- *    measurement is. We will discuss that later.
+ *    measurement is. That parameter is needed for the update methods. We will discuss that later.
  *    Now lets create and add the pulse rate. The pulse rate is a simple numeric and is simpler to construct. The vast majority of PHD measurements are simple
  *    numerics.
         s_MetMsmt *pr = NULL;                               // Again, Initialize this pointer to NULL!
@@ -145,7 +148,7 @@
  *    Now we have populated our structures for the blood pressure/pulse rate device. But structures are not sent on the wire. So the next step is to create
  *    the byte array that will be sent over the airwaves. Once we have created this byte array, we do not need the structs we have populated. All we need
  *    is the byte array struct and the indices of the measurements in the group. So now lets create the byte array struct. This struct cannot go out of scope!
- *    It must exist for the duration of the connection! The byte array of this struct will be populated with sensor data and delivered to the PHG.
+ *    It must exist for the duration of the connection! The byte array element of this struct will be populated with sensor data and delivered to the PHG.
         s_MsmtGroupData *msmtGroupBpData                = NULL; // Defined as a global variable or in some manner that it will not go out of scope
 
         result = createMsmtGroupDataArray(&msmtGroupBpData,     // Pointer to the s_MsmtGroupData pointer initialized to NULL. The library will populate this
@@ -154,11 +157,18 @@
                                                                 // not been previously allocated. NOTE THAT IT IS A POINTER to a pointer that gets passed.
                                           msmtGroup,            // The measurement group to encode into a byte array
                                           sMetTime,             // A pointer to the s_MetTime struct containing the time properties of the PHD
+                                                                // If a time stamp is not used, this parameter will be NULL.
                                           PACKET_TYPE_NORMAL);  // For now, use this. There is also an optimization option which we will not use.
                                                                 // The optimization only makes sense if you are sending lots of data such as streams
  *    Now that we have populated this struct, we dont need the s_MsmtGroup struct anymore. We call the cleanup method to free the allocated resources. The
  *    cleanup method also frees the individual measurement structs like bp and pr as well.
          cleanUpMsmtGroup(&msmtGroup); // cleans up any allocated data -  we only need the data array now
+      Now let's add the supplemental type value MDC_UPEXT_ARM_UPPER. This value is not going to change from measurement to measurement, so we can add it once
+      and be done with it. We set this value by calling the update method for supplemental types
+        updateDataMetMsmtSupplementalTypes(&msmtGroupBpData,     // The data array to be sent over the airwaves.
+                                           bp_index,             // The blood pressure measurement index, returned when making the BP measurement
+                                           MDC_UPEXT_ARM_UPPER,  // The supplemental type value which is upper arm
+                                           0);                   // The supplemental types index. We reserved only one so the index is to the first which is 0.
  *    Note that all of this can happen at power up before any Bluetooth activity starts, so there is no performance penalty while connected. At this point, 
  *    the only resources left that will need to be freed later is the data array struct 'msmtGroupBpData' (also the time related structs).
 
@@ -180,7 +190,7 @@
     0x01,                   // the flags (supports milliseconds)
     0x80,                   // time zone (unsupported)
     0x00, 0x1F,             // time sync none (may need to be updated when there is a set time) 
-    0x01,           // Group id
+    0x01,           // Group id (not used in our case so the value is not important)
     0x02,           // Number of measurements in group
     // BP measurement:
     0x04, 0x4A, 0x02, 0x00, // Measurement type: non-invasive blood pressure
@@ -207,15 +217,15 @@
 
     Here we see the DISADVANTAGE of a generic model. Those static type fields must be present even though they wont change for a given device
     type. However, they WILL change for a different device. So if the only device you make is a BP cuff, it is more efficient to use the
-    BT_SIG profile and even more efficient to use a proprietary profile customized for your device. However, special code has to be written for
+    BT_SIG BP profile and even more efficient to use a proprietary profile customized for your device. However, special code has to be written for
     just those devices and the code written is not good for anything else.
 
     Using the generic model means that clients need only be written once and they will work with this device and all devices following this standard.
     In addition, the codes used here are recognized by HL7 and IHE and puts your data immediately onto the international market.
 
-    Furthermore. if you support more than one device type, this one code base will work for all your devices. One essentially gets all the other devices
-    for free, at least with respect to code management and maintenance. This demo has setups for BP, Glucose, Pulse Ox, Thermometer, and Scale. 
-    The Spirometer doesn't count as it is a specialization under development. If one is really tight
+    Furthermore. if you support more than one device type, this one code base will work for all your devices. One esentially gets all the other devices
+    for free, at least with respect to code management and maintenance. This demo has setups for BP, Glucose, Pulse Ox, Thermometer, Spirometer, and Scale. 
+    If one is really tight
     for resources these templates that are created in situ can be created externally, copied into this implementation and the part of the library
     source used for setup and configuring the templates can be deleted. There is a Visual Studio Project that does that. The ble_app_met_epoch_bp
     is a project where this was done for the blood pressure. One can compare the memory footprint of that implementation versus this implementation
@@ -225,11 +235,11 @@
 
  * GETTING SENSOR DATA INTO THE TEMPLATE (byte array)
  * We assume that data comes from the sensor through some type of interrupt or event via a UART or SPI. There is no standard interface to a sensor.
- * Instead, the application defines a structure which the application populates with the sensor data. When the data is completed, the application
+ * Instead, the application defines a structure which the application populates with the sensor data. When the data is received, the application
  * passes this data into the provided msmt_queue. The void* along with the structure size can take any structure. The app casts back when dequeing the data.
  * The data is then retrieved from the queue and the application needs to take the data in its structure and call the appropriate update*() methods.
  * The work will be converting the data in the application-defined structure to the parameters required by the update methods. Likely the most difficult
- * will be populating the MderFloat parameters. There are some BT SIG profiles that use MderFloats.
+ * part will be populating the MderFloat parameters since most people are not familiar with MderFloats. There are some BT SIG profiles that use MderFloats.
 
  * A similar approach is used to configure the the sMetTime properties, the current time info and the system info. The system info is the simplest
  * as it is required to be static in this standard and never has to be updated.
@@ -250,14 +260,14 @@ void cleanUpSystemInfoData(s_SystemInfoData** systemInfoData);
 
 #if (USES_TIMESTAMP == 1)
     void cleanUpMetTime(s_MetTime** sMetTime);
-#endif
-void cleanUpTimeInfo(s_TimeInfo** timeInfo);
+
+    void cleanUpTimeInfo(s_TimeInfo** timeInfo);
 
 /**
  * Call this at the end of the program. Frees up all the allocated resources use in creating the TimeInfo Data
  * @param timeInfoData pointer a pointer of the application's s_TimeInfoData struct.
  */
-void cleanUpTimeInfoData(s_TimeInfoData** timeInfoData);
+    void cleanUpTimeInfoData(s_TimeInfoData** timeInfoData);
 
 /**
  * This standard defines a current time and time stamp that contain a base epoch, a set of flags, an offset shift,
@@ -308,21 +318,18 @@ void cleanUpTimeInfoData(s_TimeInfoData** timeInfoData);
  * @param timeSync the current state of timeSynchronization as 16-bit MDC code. This may be updated by a PHG set time.
  * @return true if all went well. false indicates bad input parameters or unable to allocate memory
  */
-#if (USES_TIMESTAMP == 1)
     bool createMetTime(s_MetTime **sMetTime, short offsetShift, unsigned short clockType, unsigned short clockResolution, unsigned short timeSync);
-#endif
+
 /**
  * Sets up the time info for the device. Method allocates memory for the s_TimeInfo.
  * Only one time clock type can exist. It is also possible to support no time clock at all such as for continuous live measurements.
- * This method is called even when the PHD does not support time stamps or a time clock. The PHG will be told that when it gets
- * this info from the PHD.
 
  * @param timeInfo pointer to an s_TimeInfo *struct pointer. This method will populate it. The pointer must remain in scope
  * @param sMetTime a pointer to s_MetTime struct created by the createMetTime method. Set to NULL if there are no time stamps in any measurements
  * @param allowSetTime true if PHD clock can be set. Applies only to absolute and base offset times. Ignored otherwise
  * @returns true if there are no problems.
  */
-bool createTimeInfo(s_TimeInfo **sTimeInfo, s_MetTime *sMetTime, bool allowSetTime);
+    bool createTimeInfo(s_TimeInfo **sTimeInfo, s_MetTime *sMetTime, bool allowSetTime);
 
 /**
  * This method generates the time info byte array to be sent to the client when the client asks for it. The only thing that will
@@ -332,16 +339,16 @@ bool createTimeInfo(s_TimeInfo **sTimeInfo, s_MetTime *sMetTime, bool allowSetTi
  * @param timeInfo pointer to the sTimeInfo struct populated by the createTimeInfo method.
  * @returns true if there are no problems.
  */
-bool createCurrentTimeDataBuffer(s_TimeInfoData** timeInfoDataPtr, s_TimeInfo *timeInfo);
+    bool createCurrentTimeDataBuffer(s_TimeInfoData** timeInfoDataPtr, s_TimeInfo *timeInfo);
 
 /**
  * Updates the current time info data array from a PHG set time operation.
  * @param timeInfoDataPtr pointer to an s_TimeInfoData *struct. This method will uodate it. The pointer must remain in scope
  * @param update will be a 10-byte array from the set time operation.
  */
- #if (USES_TIMESTAMP == 1)
+
     bool updateCurrentTimeFromSetTime(s_TimeInfoData** timeInfoDataPtr, unsigned char *update);
-#endif
+
 /**
  * Following methods update the current time info data array from the PHD (for example in response to a PHG get current time info command).
  * There are various methods depending upon which fields need to be updated.
@@ -353,7 +360,7 @@ bool createCurrentTimeDataBuffer(s_TimeInfoData** timeInfoDataPtr, s_TimeInfo *t
  * @param timeInfoDataPtr pointer to an s_TimeInfoData *struct. This method will uodate it. The pointer must remain in scope
  * @param offsetShift the current timezone offset shift from UTC in 15-minute units. If not supported set to 0x80.
  */
-bool updateCurrentTimeFromPhdOffset(s_TimeInfoData** timeInfoDataPtr, short offsetShift);
+    bool updateCurrentTimeFromPhdOffset(s_TimeInfoData** timeInfoDataPtr, short offsetShift);
 
 /**
  * This method updates the time sync. Usually this will happen from a set time but that is handled by calling
@@ -361,7 +368,7 @@ bool updateCurrentTimeFromPhdOffset(s_TimeInfoData** timeInfoDataPtr, short offs
  * @param timeInfoDataPtr pointer to an s_TimeInfoData *struct. This method will uodate it. The pointer must remain in scope
  * @param timeSync the time synchronization MDC term code from partition 8.
  */
-bool updateCurrentTimeFromPhdTimeSync(s_TimeInfoData** timeInfoDataPtr, unsigned short timeSync);
+    bool updateCurrentTimeFromPhdTimeSync(s_TimeInfoData** timeInfoDataPtr, unsigned short timeSync);
 
 /**
  * The option allows the application to update just the epcoh portion of the current time.
@@ -369,10 +376,10 @@ bool updateCurrentTimeFromPhdTimeSync(s_TimeInfoData** timeInfoDataPtr, unsigned
  * @param epoch the epoch value in units of milliseconds. If only seconds resolution is supported, the lowest three digits
  * are all zeros.
  */
-bool updateCurrentTimeEpoch(s_TimeInfoData** timeInfoDataPtr, unsigned long long epoch);
+    bool updateCurrentTimeEpoch(s_TimeInfoData** timeInfoDataPtr, unsigned long long epoch);
 
-unsigned short getTimeSync(s_TimeInfoData* timeInfoData);
-
+    unsigned short getTimeSync(s_TimeInfoData* timeInfoData);
+#endif
 /** Helper to load a string into bytes within an array
  * @param str input string
  * @param systemInfoBuf the byte array where you want to place the string

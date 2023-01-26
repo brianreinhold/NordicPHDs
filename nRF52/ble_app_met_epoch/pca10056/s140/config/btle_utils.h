@@ -133,5 +133,6 @@ char* xstrcat(char* dest, const char* src);
 char* byteToHex(unsigned char* bytes, char* buffer, char* separator, unsigned long count);
 int twoByteEncode(unsigned char* msmtBuf, int index, unsigned short value);
 int fourByteEncode(unsigned char* msmtBuf, int index, unsigned long value);
+int sixByteEncode(unsigned char* msmtBuf, int index, unsigned long long value);
 bool hexToLittleEndianByte(char* hexString, unsigned char* byteArray);
 #endif
