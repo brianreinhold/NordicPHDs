@@ -78,7 +78,7 @@ It should be noted that the above packets are not the complete simple numeric pa
 
 ## **PHD-Gateway Exchange Sequence**
 
-The exchange between the gateway client and PHD is steered from the client and is _synchronous and ordered._ The client sends commands to get the MPM packets in a specified order.
+The exchange between the gateway client and PHD is steered from the client and is _synchronous and ordered._ The client sends commands to get the MPM packets in a specified order. The client cannot send another command until the server indicates it is done with the previous command.
 
 - Request current time and clock information
   - PHD sends current time and clock information packet – may indicate no time support
