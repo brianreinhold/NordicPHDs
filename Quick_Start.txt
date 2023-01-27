@@ -25,8 +25,8 @@ In the handleSpecializations.h file select which device specialization to suppor
 If using Keil, be sure that Flash/Configure Flash Tools/Debug/ that J-LINK / J-TRACE Cortex is selected in the drop down box to the far right. 
 It may be set to a ULINK option out of the box.
                Clicking on the Settings button to the left of this input box should show the Port box set to 'SW'
-Be sure Flash/Configure Flash Tools/Utilities/(press Settings button) Reset and Run is checked. If not, you will need to press the BOTT/RESET button
-on a flash before the program will run.
+Be sure Flash/Configure Flash Tools/Utilities/(press Settings button) Reset and Run is checked. If not, you will need to press the BOOT/RESET button
+after a flash/download before the program will run.
 
 On the nRF51 platform, be sure to set the STACK SIZE and HEAP_SIZE to 4096. It can be done by setting a preprocessor Macro or directly in the
 assembly code 'arm_startup_nrf51.s' under Device in the Project window. The GHS requires more memory and resources than the MET for a given 
@@ -39,4 +39,10 @@ When flashing a build from SES, there is a bug where you have to press the boot/
 known and Segger is not going to address it.
 
 You do NOT need to do this once installed and/or after a power cycle.
+
+Once the program is installed onto the DK:
+
+Button 4 creates a measurement that is stored if you allow stored data. Pressing this button has to be done before starting advertisements.
+Button 3 starts advertising
+Button 2 disconnects.
 
