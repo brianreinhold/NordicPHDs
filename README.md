@@ -139,7 +139,7 @@ Though there are thousands of term codes, at this time there are only a few part
 | MDC\_PART\_PHD\_HF | 129 | Health and Fitness related codes |
 | MDC\_PART\_PHD\_AI | 130 | Assisted and Independent Living related codes. |
 
-The use of codes is what makes the MPM generic. The only device protocol that uses codes at the current time is the IEEE 11073 20601 and 10201 standards. Codes are totally absent in the BT-SIG profiles, however, codes are ubquitous in HL7 and IHE. The MDC codes are used versus LOINC or SNOMED since MDC codes are designed for medical devices.
+The use of codes is what makes the MPM generic. The only device protocol that uses codes at the current time is the IEEE 11073 20601 and 10201 standards and the up-and-coming GHS standard. Codes are totally absent in the remaining BT-SIG profiles, however, codes are ubquitous in HL7 and IHE. The MDC codes are used versus LOINC or SNOMED since MDC codes are designed for medical devices.
 
 # **Handling Measurement Time Stamps**
 
