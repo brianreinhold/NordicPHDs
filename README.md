@@ -43,7 +43,7 @@ The Metric Data packet defines the following templates for the supported measure
 
 Each packet is a &#39;template&#39;. IEEE 11073 10101 nomenclature codes are used to interpret the semantic meaning of the items within the template. Nomenclature codes are 32-bit unsigned numbers. Since 32-bit numbers are hard to remember, reference identifiers are used to indicate what those numbers mean for human convenience. Reference identifiers are not used on the wire in this packet model. An example of a reference identifier and the 32-bit code it corresponds to is MDC\_TEMP\_ORAL (188424).
 
-The template allows an implementer to write code once for each template and it will handle all PHD types now and in the future that use that template. Recall the Reference identifiers are just 32-bit numbers. The unit code reference identifiers are 16-bit numbers.
+The template allows an implementer to write code once for each template and it will handle all PHD types now and in the future that use that template. Recall the Reference identifiers are just 32-bit numbers. The unit code reference identifiers are 16-bit numbers since all unit codes are in partition 4 (upper 16 bits) and it is not necessary to send that.
 
 ### Example
 
