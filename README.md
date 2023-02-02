@@ -103,7 +103,7 @@ The exchange between the gateway client and PHD is steered from the client and i
   - PHD indicates it is done with the task
 - Send Live Data (this is the last request the gateway can make)
   - For each live measurement taken
-    - PHD send record
+    - PHD sends record
     - PHD indicates it is done with the record
   - PHD disconnects when it has nothing more to send
 
