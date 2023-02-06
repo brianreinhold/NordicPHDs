@@ -197,7 +197,7 @@ unsigned short security_char_length = 2;
 #endif
 #if (HEART_RATE == 1)
     const char nameKey[10] = {'G', 'H', 'S', '_', 'H', 'R', ' ', ' ', ' ', ' '};
-    const unsigned char feature[10] = {FEATURE_HAS_DEVICE_SPECIALIZATIONS, 
+    unsigned char feature[10] = {FEATURE_HAS_DEVICE_SPECIALIZATIONS, 
               1,  0x82, 0x41, 0x02, 0x00,
               1,  0x8D, 0x10, 0x01};
     unsigned short feature_length = 10;
@@ -1536,12 +1536,15 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
     #if (BP_CUFF == 1)
                 char buffer[512];
                 memset(buffer, 0, 512);
-        storedMsmts[numberOfStoredMsmtGroups].hasTimeStamp = true;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch = epoch + timeStampMsmt;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockType = sMetTime->clockType;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockResolution = sMetTime->clockResolution;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.offsetShift = sMetTime->offsetShift;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.timeSync = sMetTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch = epoch + timeStampMsmt;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.offsetShift = sGhsTime->offsetShift;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockType = sGhsTime->clockType;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
         storedMsmts[numberOfStoredMsmtGroups].systolic = 95 + (timeStamp & 0x0F);
         storedMsmts[numberOfStoredMsmtGroups].diastolic = 55 + (timeStamp & 0x0F);
         storedMsmts[numberOfStoredMsmtGroups].mean = 
@@ -1559,16 +1562,19 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
                 storedMsmts[numberOfStoredMsmtGroups].diastolic,
                 storedMsmts[numberOfStoredMsmtGroups].mean,
                 storedMsmts[numberOfStoredMsmtGroups].pulseRate, 
-                storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch);
+                storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch, timeStamp);
         return true;
     #endif
     #if (PULSE_OX == 1)
-        storedMsmts[numberOfStoredMsmtGroups].hasTimeStamp = true;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch = epoch + timeStampMsmt;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockType = sMetTime->clockType;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockResolution = sMetTime->clockResolution;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.offsetShift = sMetTime->offsetShift;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.timeSync = sMetTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch = epoch + timeStampMsmt;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.offsetShift = sGhsTime->offsetShift;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockType = sGhsTime->clockType;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
 
         storedMsmts[numberOfStoredMsmtGroups].spo2 = 95 + (timeStamp & 0x03);
         storedMsmts[numberOfStoredMsmtGroups].pulseRate = 45 + (timeStamp & 0x07);
@@ -1577,15 +1583,20 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         NRF_LOG_INFO("Measurement added: SpO2 %u%, PR %u, Pulsatile X 100 %u%, timestamp %lu", 
             storedMsmts[numberOfStoredMsmtGroups].spo2, 
             storedMsmts[numberOfStoredMsmtGroups].pulseRate,
+            storedMsmts[numberOfStoredMsmtGroups].pulseQuality, timeStamp);
         return true;
     #endif
     #if (GLUCOSE == 1)
 
-        storedMsmts[numberOfStoredMsmtGroups].hasTimeStamp = true;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch = epoch + timeStampMsmt;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockType = sMetTime->clockType;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockResolution = sMetTime->clockResolution;        storedMsmts[numberOfStoredMsmtGroups].sMetTime.offsetShift = sMetTime->offsetShift;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.timeSync = sMetTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch = epoch + timeStampMsmt;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.offsetShift = sGhsTime->offsetShift;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockType = sGhsTime->clockType;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
         storedMsmts[numberOfStoredMsmtGroups].conc = (95 + (timeStamp & 0x1F)) * 10;
         storedMsmts[numberOfStoredMsmtGroups].body_site = MDC_CTXT_GLU_SAMPLELOCATION_FINGER + (timeStamp & 0x03) * 4;
         storedMsmts[numberOfStoredMsmtGroups].meal_context = MDC_CTXT_GLU_MEAL_PREPRANDIAL + (timeStamp & 0x03) * 4;
@@ -1605,12 +1616,15 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         return true;
     #endif
    #if (SCALE == 1)
-        storedMsmts[numberOfStoredMsmtGroups].hasTimeStamp = true;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch = epoch + timeStampMsmt;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockType = sMetTime->clockType;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockResolution = sMetTime->clockResolution;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.offsetShift = sMetTime->offsetShift;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.timeSync = sMetTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch = epoch + timeStampMsmt;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.offsetShift = sGhsTime->offsetShift;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockType = sGhsTime->clockType;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
         storedMsmts[numberOfStoredMsmtGroups].mass = 6800 + (timeStamp & 0xFF);
 
         NRF_LOG_INFO("Measurement added: Weight %u%, timestamp %lu", 
@@ -1618,12 +1632,15 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         return true;
     #endif
     #if (THERMOMETER == 1)
-        storedMsmts[numberOfStoredMsmtGroups].hasTimeStamp = true;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.epoch = epoch + timeStampMsmt;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockType = sMetTime->clockType;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.clockResolution = sMetTime->clockResolution;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.offsetShift = sMetTime->offsetShift;
-        storedMsmts[numberOfStoredMsmtGroups].sMetTime.timeSync = sMetTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
+        storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.epoch = epoch + timeStampMsmt;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.offsetShift = sGhsTime->offsetShift;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockType = sGhsTime->clockType;
+        storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
         storedMsmts[numberOfStoredMsmtGroups].temp = 9800 + (timeStamp & 0xFF);
         storedMsmts[numberOfStoredMsmtGroups].ambient = 7200 + (timeStamp & 0x1FF);
 
@@ -2056,7 +2073,7 @@ void setNotOnCurrentTimeline(unsigned long long newCount)
     #if (USES_STORED_DATA == 1)
         for (i = 0; i < numberOfStoredMsmtGroups; i ++)
         {
-            storedMsmts[i].sMetTime.flagUnknownTimeline = MET_TIME_FLAG_UNKNOWN_TIMELINE;
+            storedMsmts[i].common.sGhsTime.flagKnownTimeline = 0;
         }
     #endif
 }
