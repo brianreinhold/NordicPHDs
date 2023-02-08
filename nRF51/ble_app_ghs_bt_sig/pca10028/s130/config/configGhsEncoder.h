@@ -46,7 +46,7 @@
  *    The other element of this structure is the value. That we will set when we get data from the sensor. The subTypes can be set once as they will
  *    never change. So once we decide what is in our compound measurement, we create the compound measurement and then add it to our group:
         s_GhsMsmt *bp = NULL;               // Initialize this pointer to NULL!
-        result = createCompoundNumericMsmt(&bp,                     // The library will populate this structure. It will allocate memory for it
+        result = createComplexCompoundNumericMsmt(&bp,                     // The library will populate this structure. It will allocate memory for it
                                                                     // NOTE THAT IT IS A POINTER to a pointer that gets passed.
                                            MDC_PRESS_BLD_NONINV,    // This is the 32-bit MDC code that expresses what the overall compound measurement
                                                                     // is. In this case it is 'non-invasive blood pressure'.

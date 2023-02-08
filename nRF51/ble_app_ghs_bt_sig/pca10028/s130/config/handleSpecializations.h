@@ -6,11 +6,11 @@
 #include "GhsControlStructs.h"
 
 
-#define BP_CUFF 0
+#define BP_CUFF 1
 #define PULSE_OX 0
 #define GLUCOSE 0
 #define HEART_RATE 0
-#define SPIROMETER 1
+#define SPIROMETER 0
 #define SCALE 0
 #define THERMOMETER 0
 

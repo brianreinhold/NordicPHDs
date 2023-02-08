@@ -1001,7 +1001,7 @@ void addId(s_MsmtGroupData** msmtGroupData, unsigned short id_index, unsigned lo
             return false;
         }
         ghsMsmt->type = type;
-        ghsMsmt->msmtValueType = isComplex ? MSMT_VALUE_COMPOUND_COMPLEX : MSMT_VALUE_COMPOUND;
+        ghsMsmt->msmtValueType = MSMT_VALUE_COMPOUND_COMPLEX;
         ghsMsmt->flagSfloat = isSfloat ? FLAGS_USES_SFLOAT : 0;
         ghsMsmt->flagId = (hasMsmtId ? FLAGS_HAS_OBJECT_ID : 0);
         ghsMsmt->compoundNumeric->numberOfComponents = numberOfComponents;
@@ -1060,16 +1060,16 @@ void addId(s_MsmtGroupData** msmtGroupData, unsigned short id_index, unsigned lo
 
 
         s_GhsMsmtIndex* sGhsMsmtIndex = msmtGroupData->sGhsMsmtIndex[msmtIndex];
-        bool isComplex = (sGhsMsmtIndex->msmtValueType == MSMT_VALUE_COMPOUND_COMPLEX);
-        if (sGhsMsmtIndex->msmtValueType != MSMT_VALUE_COMPOUND && !isComplex)
+        //bool isComplex = (sGhsMsmtIndex->msmtValueType == MSMT_VALUE_COMPOUND_COMPLEX);
+        if (sGhsMsmtIndex->msmtValueType != MSMT_VALUE_COMPOUND_COMPLEX)
         {
-            NRF_LOG_DEBUG("Measurement is not a compound or complex compound. Skipping");
+            NRF_LOG_DEBUG("Measurement is not a complex compound. Skipping");
             return false;
         }
         unsigned short i;
         addId(msmtGroupDataPtr, sGhsMsmtIndex->id_index, msmt_id);
         unsigned short index = sGhsMsmtIndex->value_index;
-        unsigned short increment = isComplex ? 7 : 4;
+        unsigned short increment = 7;
         for (i = 0; i < sGhsMsmtIndex->numberOfCmpds; i++)
         {
             if (sGhsMsmtIndex->isSfloat)
@@ -1090,7 +1090,7 @@ void addId(s_MsmtGroupData** msmtGroupData, unsigned short id_index, unsigned lo
         return true;
     }
 
-    bool createCompoundNumericMsmt(s_GhsMsmt** ghsMsmtPtr, unsigned long type, bool isSfloat, unsigned short units, 
+    static bool createCompoundNumericMsmt(s_GhsMsmt** ghsMsmtPtr, unsigned long type, bool isSfloat, unsigned short units, 
         unsigned short numberOfComponents, s_Compound *compounds, bool hasMsmtId)
     {
         return createCompoundMsmt(ghsMsmtPtr, type, isSfloat, units, numberOfComponents, compounds, false, hasMsmtId);
@@ -1669,16 +1669,9 @@ static unsigned short computeLengthOfMsmtGroup(s_MsmtGroup *msmtGroup)
         }
         else if (ghs->compoundNumeric != NULL)
         {
-            if (ghs->msmtValueType == MSMT_VALUE_COMPOUND)
-            {
-                groupLength = groupLength + 3 + // units, number of components
-                    ghs->compoundNumeric->numberOfComponents * ((ghs->flagSfloat) ? 6 : 8); // sub types + sub values
-            }
-            else  // Complex compound
-            {
-                groupLength = groupLength + 1 + // number of components
-                        ghs->compoundNumeric->numberOfComponents * ((ghs->flagSfloat) ? 9 : 11); // sub types + msmt type + sub units + sub values
-            }
+            groupLength = groupLength + 1 + // number of components
+            ghs->compoundNumeric->numberOfComponents * ((ghs->flagSfloat) ? 9 : 11); // sub types + msmt type + sub units + sub values
+
         }
         else if (ghs->codedEnum != NULL)
         {
@@ -1894,7 +1887,7 @@ bool createMsmtGroupDataArray(s_MsmtGroupData** msmtGroupDataPtr, s_MsmtGroup *m
                 if (isComplex)
                 {
                     // msmt type flag (only doing numeric)
-                    msmtBuf[index++] = 0;
+                    msmtBuf[index++] = MSMT_VALUE_NUMERIC;
                     // units
                     index = twoByteEncode(msmtBuf, index, ghs->compoundNumeric->value[k]->subUnits);
                     ghsLength = ghsLength + 3;

@@ -89,16 +89,16 @@
 
 
 // Individual neasurement value types
-#define MSMT_VALUE_NUMERIC 0
-#define MSMT_VALUE_CODED 1
-#define MSMT_VALUE_STRING 2
-#define MSMT_VALUE_RTSA 3
-#define MSMT_VALUE_COMPOUND_COMPLEX 4
+#define MSMT_VALUE_NUMERIC 1
+#define MSMT_VALUE_CODED 2
+#define MSMT_VALUE_STRING 3
+#define MSMT_VALUE_RTSA 4
 #define MSMT_VALUE_COMPOUND_CODED 5
 #define MSMT_VALUE_BITS 6
-#define MSMT_VALUE_MIXED_METRIC 7
+#define MSMT_VALUE_COMPOUND_COMPLEX 7
+#define MSMT_VALUE_MIXED_METRIC 7       // Support only the (complex) compound
 #define MSMT_VALUE_TLV 8
-#define MSMT_VALUE_COMPOUND 9
+//#define MSMT_VALUE_COMPOUND 7
 #define MSMT_VALUE_GROUP 0xFF
 
 // For the s_TimeInfo struct
