@@ -46,3 +46,10 @@ Button 4 creates a measurement that is stored if you allow stored data. Pressing
 Button 3 starts advertising
 Button 2 disconnects.
 
+For each of the specialization there is also the option to
+turn off/on pairing
+turn on/off use of time stamps
+turn on/off use of stored data
+use different types of time clocks - relative time or epoch time
+use different time resolutions (seconds, tenths, hundredths, milliseconds)
+
