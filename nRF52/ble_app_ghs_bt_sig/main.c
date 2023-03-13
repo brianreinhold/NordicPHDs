@@ -210,6 +210,8 @@ __ALIGN(4) uint8_t *evt_buf2;
 
 static uint8_t cpResponse[4];
 
+uint8_t tempBuf[512];  // For send_data
+
 //=========================== PARAMETERS FOR GHS DATA
 s_Queue *queue;
 
@@ -829,6 +831,29 @@ static bool on_generic_ble_evt(ble_evt_t * p_ble_evt)
     return true;
 }
 
+static void print_data(unsigned char *data, unsigned short data_length)
+{
+    if(data_length > 0)
+    {
+        // All this crap is just to print the data being sent in 32-byte chunks
+        int j = 0;
+        int chunk = (data_length > 32) ? 32 : data_length;
+        char buffer[104];
+        while (true)
+        {
+            memset(buffer, 0, 104);
+            if ((j + 32) > data_length)
+            {
+                chunk = data_length - j;
+            }
+            NRF_LOG_INFO("%s", (uint32_t)byteToHex(&data[j], buffer, " ", chunk));
+            j = j + chunk;
+            if (j >= data_length) break;
+        }
+        NRF_LOG_FLUSH();
+    }
+}
+
 static ret_code_t send_data()
 {
     if (global_send.data_length == 0 || !send_flag)   // Nothing to send
@@ -852,90 +877,80 @@ static ret_code_t send_data()
         recordNum = global_send.recordNumber;
         frag_header = 0xFD; // first fragment - well after 4 gets added to it. Each count increments by 4
         NRF_LOG_INFO("=====> Sending %u bytes of data at time %u: ", global_send.data_length, getTicks());
-        // All this crap is just to print the data being sent in 32-byte chunks
-        int j = 0;
-        int size = (global_send.data_length > 32) ? 32 : global_send.data_length;
-        char buffer[104];
-        while (true)
-        {
-            memset(buffer, 0, 104);
-            if ((j + 32) > global_send.data_length)
-            {
-                size = global_send.data_length - j;
-            }
-            NRF_LOG_INFO("%s", (uint32_t)byteToHex(&global_send.data[j], buffer, " ", size));
-            NRF_LOG_FLUSH();
-            j = j + size;
-            if (j >= global_send.data_length) break;
-        }
+        print_data(global_send.data, global_send.data_length);
     }
     send_flag = false;
 
     while(true)
     {
+        NRF_LOG_DEBUG("Start of send while loop");
         unsigned short data_reduction = 0; // Reduction of data size sent due to fragment and record number headers
         bool insert_recordNumber = false;
-        uint8_t tempBuf[512];
-        if (ghs_abort // connection has been terminated by PHG
-            || (m_connection_handle == BLE_CONN_HANDLE_INVALID))    // the connection has been killed
+        if (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle || global_send.handle == m_ghs_bt_sig_stored_data_not_handle.value_handle)
         {
-            NRF_LOG_DEBUG("=====> Aborted or connection handle invalid");
-            emptyQueue(queue);
-            error_code = NRF_ERROR_INVALID_STATE;
-            break;
-        }
-        if (global_send.handle == m_ghs_bt_sig_stored_data_not_handle.value_handle)  // If stored data 
-        {
-            if ((frag_header & 0x01) == 0x01)  // if first fragment
+            memset(tempBuf, 0, 512);
+            if (ghs_abort // connection has been terminated by PHG
+                || (m_connection_handle == BLE_CONN_HANDLE_INVALID))    // the connection has been killed
             {
-                insert_recordNumber = true;    // need to insert record number as well as fragment
-                data_reduction = 5;            // How much the actual data size being sent is reduced
+                NRF_LOG_DEBUG("=====> Aborted or connection handle invalid");
+                emptyQueue(queue);
+                error_code = NRF_ERROR_INVALID_STATE;
+                break;
             }
-            else
+            if (global_send.handle == m_ghs_bt_sig_stored_data_not_handle.value_handle)  // If stored data 
+            {
+                if ((frag_header & 0x01) == 0x01)  // if first fragment
+                {
+                    insert_recordNumber = true;    // need to insert record number as well as fragment
+                    data_reduction = 5;            // How much the actual data size being sent is reduced
+                }
+                else
+                {
+                    data_reduction = 1;
+                }
+            }
+            else if (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle)
             {
                 data_reduction = 1;
             }
-        }
-        else if (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle)
-        {
-            data_reduction = 1;
-        }
-        // If amount of data exceeds max size, send chunk sized length of data
-        if (global_send.data_length - global_send.offset > global_send.chunk_size - data_reduction) //(mtu_size - OPCODE_LENGTH - HANDLE_LENGTH))
-        {
-            hvx_length = global_send.chunk_size; //(mtu_size - OPCODE_LENGTH - HANDLE_LENGTH);
-        }
-        // If the amount is less than that value set it to the amount left.
-        else
-        {
-            frag_header = (frag_header | 2);
-            hvx_length = global_send.data_length - global_send.offset + data_reduction;
-        }
-        frag_header = frag_header + 4;        // Now increment the fragment counter bits 2-7. Bits 0 and one are set appropriately.
-        NRF_LOG_DEBUG("=====> Send # %u: Send %u bytes of %u total from offset %u at time %u. Data reduction: %u",
-            count, hvx_length - data_reduction, global_send.data_length, global_send.offset, getTicks(), data_reduction);
-        NRF_LOG_DEBUG("=====> Handle %u cp handle %u, stored handle %u, live handle %u", 
-            global_send.handle, m_racp_handle.value_handle, m_ghs_bt_sig_stored_data_not_handle.value_handle,
-            m_ghs_bt_sig_live_data_not_handle.value_handle);
-        count++;
+            // If amount of data exceeds max size, send chunk sized length of data
+            if (global_send.data_length - global_send.offset > global_send.chunk_size - data_reduction) //(mtu_size - OPCODE_LENGTH - HANDLE_LENGTH))
+            {
+                hvx_length = global_send.chunk_size; //(mtu_size - OPCODE_LENGTH - HANDLE_LENGTH);
+            }
+            // If the amount is less than that value set it to the amount left.
+            else
+            {
+                frag_header = (frag_header | 2);
+                hvx_length = global_send.data_length - global_send.offset + data_reduction;
+            }
+            frag_header = frag_header + 4;        // Now increment the fragment counter bits 2-7. Bits 0 and one are set appropriately.
+            NRF_LOG_DEBUG("=====> Send # %u: Send %u bytes of %u total from offset %u at time %u. Data reduction: %u",
+                count, hvx_length - data_reduction, global_send.data_length, global_send.offset, getTicks(), data_reduction);
+            NRF_LOG_DEBUG("=====> Handle %u cp handle %u, stored handle %u, live handle %u", 
+                global_send.handle, m_racp_handle.value_handle, m_ghs_bt_sig_stored_data_not_handle.value_handle,
+                m_ghs_bt_sig_live_data_not_handle.value_handle);
+            count++;
 
-        hvx_params.handle = global_send.handle;
-        uint8_t enable = BLE_GATT_HVX_INDICATION;
-        if (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle)
-        {
-            enable = cccdSet[LIVE_DATA_CCCD_INDEX];
-        }
-        else if (global_send.handle == m_ghs_bt_sig_stored_data_not_handle.value_handle)
-        {
-            enable = cccdSet[STORED_DATA_CCCD_INDEX];
-        }
-        hvx_params.type = enable;
-        hvx_params.offset = 0; // global_send_offset;
-        hvx_params.p_len = &hvx_length;
+            hvx_params.handle = global_send.handle;
+            uint8_t enable = (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle) ? 
+                    cccdSet[LIVE_DATA_CCCD_INDEX] : cccdSet[STORED_DATA_CCCD_INDEX];
+            if (enable == BLE_GATT_HVX_INVALID)
+            {
+                global_send.data_length = 0;
+                global_send.offset = 0;
+                global_send.data = NULL;
+                global_send.handle = 0;
+                emptyQueue(queue);
+                error_code = NRF_SUCCESS;
+                break;
+            }
+            hvx_params.type = enable;
+            hvx_params.offset = 0; // global_send_offset;
+            hvx_params.p_len = &hvx_length;
         
-        // Insert headers
-        if (global_send.handle != m_racp_handle.value_handle && global_send.handle != m_ghs_bt_sig_cp_handle.value_handle)
-        {
+            // Insert headers
+
             if (insert_recordNumber)
             {
                 // Here is the crap - I have to stick one extra byte at the start of this fragment and the record number, but record number only on first fragment.
@@ -952,27 +967,18 @@ static ret_code_t send_data()
         }
         else // No fragmentation for control point indications
         {
+            hvx_params.handle = global_send.handle;
+            hvx_params.type = BLE_GATT_HVX_INDICATION;
+            hvx_params.offset = 0;
+            hvx_length = global_send.data_length;
+            hvx_params.p_len = &hvx_length;
             memcpy(tempBuf, global_send.data, hvx_length);
         }
         hvx_params.p_data = tempBuf;
 
         // Send indication or notification
         NRF_LOG_DEBUG("=====> Sending %u bytes", hvx_length);
-        int j = 0;
-        int size = (hvx_length > 32) ? 32 : hvx_length;
-        char buffer[104];
-        while (true)
-        {
-            memset(buffer, 0, 104);
-            if ((j + 32) > hvx_length)
-            {
-                size = hvx_length - j;
-            }
-            NRF_LOG_INFO("%s", (uint32_t)byteToHex(&tempBuf[j], buffer, " ", size));
-            NRF_LOG_FLUSH();
-            j = j + size;
-            if (j >= hvx_length) break;
-        }
+        print_data(tempBuf, hvx_length);
         error_code = sd_ble_gatts_hvx(m_connection_handle, &hvx_params);
         if (error_code == NRF_SUCCESS)
         {
@@ -1040,7 +1046,7 @@ static void createRacpResponse(uint8_t *response, uint16_t length)
     global_send.chunks_outstanding = 0;
     global_send.handle = m_racp_handle.value_handle;
 
-    NRF_LOG_DEBUG("Response field non NULL: value 0x%u", *response);
+    NRF_LOG_DEBUG("Response field non NULL: value 0x%x", *response);
     memcpy(cpResponse, response, length);
     global_send.data_length = length;
 
@@ -1053,7 +1059,7 @@ static void createCpResponse(uint8_t *response, uint16_t length)
     global_send.chunks_outstanding = 0;
     global_send.handle = m_ghs_bt_sig_cp_handle.value_handle;
 
-    NRF_LOG_DEBUG("Response field non NULL: value 0x%u", *response);
+    NRF_LOG_DEBUG("Response field non NULL: value 0x%x", *response);
     memcpy(cpResponse, response, length);
     global_send.data_length = length;
 
@@ -1189,7 +1195,8 @@ static void ghscp_handler(unsigned char *cmd, unsigned short len)
             if (!racp_mode)                 // If we are NOT doing an RACP procedure
             {
                 printCommand(str, global_send.current_command);
-                if (cccdSet[LIVE_DATA_CCCD_INDEX])                // Has the live data characteristic been enabled?
+
+                if (cccdSet[LIVE_DATA_CCCD_INDEX] > 0)                // Has the live data characteristic been enabled?
                 {
                     createCpResponse(GHSCP_RSP_SUCCESS, 1);       // Indicate a success response
                     current_char_handle = m_ghs_bt_sig_live_data_not_handle.value_handle;  // NEEDED FOR THE SEND_DATA method!!
@@ -1199,6 +1206,7 @@ static void ghscp_handler(unsigned char *cmd, unsigned short len)
                     createCpResponse(GHSCP_RSP_LIVE_CCCD_DISABLED, 1);       // Indicate live data characteristic not enabled response
                 }
                 live_data_mode = (cmd[0] == GHSCP_SET_LIVE_DATA_MODE);       // Set/Clear our internal live data mode flag
+                NRF_LOG_INFO("Current enabled state of live data characteristic %u.  Live data mode is now %u", cccdSet[LIVE_DATA_CCCD_INDEX], live_data_mode);
             }
             else
             {
@@ -1431,7 +1439,7 @@ static bool handleCommonEvents(ble_evt_t* p_ble_evt)
             if (mtu_size > NRF_SDH_BLE_GATT_MAX_MTU_SIZE)   // Set in sdk_config.h
             {
                 mtu_size = NRF_SDH_BLE_GATT_MAX_MTU_SIZE;
-                NRF_LOG_DEBUG("Requested MTU size exceeds maximum; reset to maximum size of %d", mtu_size);
+                NRF_LOG_DEBUG("Requested MTU size exceeds our maximum; reset to maximum size of %d", mtu_size);
             }
             err_code = sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle, mtu_size);
 
@@ -1558,6 +1566,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 
             NRF_LOG_INFO("Connection event received at time %u.", getTicks());
             m_connection_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            global_send.chunk_size = (mtu_size - OPCODE_LENGTH - HANDLE_LENGTH);
             if (saveDataBuffer != NULL)
             {
                 // Calling sd_ble_gatts_sys_attr_set with CCCD info
@@ -1680,6 +1689,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
                 break;
             }
+            reset_specializations();
             #if (USE_DK == 0)
                 restartAdv = true;
             #endif

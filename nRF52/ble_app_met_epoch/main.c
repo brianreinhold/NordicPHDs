@@ -46,7 +46,7 @@
  *
  * The basic idea is that the application developer decides what measurements the device
  * is going to generate and report, and a template (array of bytes) is created that
- * supports those measurements. The template follows the MET standard.
+ * supports those measurements. The template follows the MET experimental protoype.
  *
  * When measurement data is received, the updated values are inserted into the template
  * at their proper locations and then the array is pushed over the tunnel to the client.
@@ -195,6 +195,9 @@ static uint16_t                 m_connection_handle             = BLE_CONN_HANDL
 static uint16_t                 m_met_service_handle            = BLE_GATT_HANDLE_INVALID;
 static ble_gatts_char_handles_t m_met_cp_handle;
 static ble_gatts_char_handles_t m_met_response_handle;
+
+#define COMMAND_CHAR 0
+#define RESPONSE_CHAR 1
 static unsigned char            cccdSet[2]                      = {0, 0};
 static unsigned short           noOfCccds                       = 2;
 static bool                     hasEncrypted                    = false;
@@ -646,7 +649,7 @@ static bool on_generic_ble_evt(ble_evt_t * p_ble_evt)
             APP_ERROR_CHECK(err_code);
             break; // BLE_EVT_USER_MEM_REQUEST
 
-        // MET - Should never happen but with BT_SIG it needs to for reading current time
+        // MET - Should never happen but with BT_SIG it's needed for reading current time
         case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST:
         {
             ble_gatts_evt_rw_authorize_request_t  req;
@@ -752,7 +755,7 @@ static ret_code_t send_data()
         count++;
 
         hvx_params.handle = global_send.handle;
-        hvx_params.type = (global_send.handle == m_met_response_handle.value_handle) ? cccdSet[1] : BLE_GATT_HVX_INDICATION;
+        hvx_params.type = (global_send.handle == m_met_response_handle.value_handle) ? cccdSet[RESPONSE_CHAR] : BLE_GATT_HVX_INDICATION;
         hvx_params.offset = 0; // global_send_offset;
         hvx_params.p_len = &hvx_length;
         hvx_params.p_data = (unsigned char *)(global_send.data + global_send.offset);
@@ -863,7 +866,7 @@ bool readyToSend()
     return (                                      // If PHG has given the send live data command and
         m_connection_handle != BLE_CONN_HANDLE_INVALID   // the connection is valid and
         && hasEncrypted                                     // encryption has been done
-        && cccdSet[1]);                                      // the response characteristic has been enabled
+        && cccdSet[RESPONSE_CHAR]);                                      // the response characteristic has been enabled
 }
 
 
@@ -897,7 +900,7 @@ bool prepareMeasurements(s_MsmtGroupData *msmtGroupData)
 #if (USES_STORED_DATA == 1)
 void sendStoredMeasurements(unsigned short stored_count)
 {
-    if (m_connection_handle != BLE_CONN_HANDLE_INVALID && cccdSet[1])
+    if (m_connection_handle != BLE_CONN_HANDLE_INVALID && cccdSet[RESPONSE_CHAR])
     {
         sendStoredSpecializationMsmts(stored_count);
         bsp_board_led_on(MSMT_DATA_LED);
@@ -907,7 +910,7 @@ void sendStoredMeasurements(unsigned short stored_count)
 
 static bool encodeMsmtData(void *data)
 {
-    if (global_send.handle != 0)
+    if (global_send.handle != 0)  // If the handle is non zero bytes are being sent and it is not yet done
     {
         if (!met_abort)
         {
@@ -916,7 +919,7 @@ static bool encodeMsmtData(void *data)
         NRF_LOG_DEBUG("Not ready for measurement # %lu", live_data_count);
         return false;
     }
-    if (send_flag)
+    if (send_flag)  // A packet is still in the process of being sent
     {
         NRF_LOG_DEBUG("Not ready for live measurement # %lu, still sending", live_data_count);
         return false;
@@ -1464,57 +1467,57 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
             break;
 
         #if (SUPPORT_PAIRING > 0)
-        // Encryption has been established
-        case BLE_GAP_EVT_CONN_SEC_UPDATE:
-        {
-            NRF_LOG_INFO("Encryption established");
-            hasEncrypted = true;
-        }
-        break;
-
-        /* This event is signaled when pairing has completed. All the key information is
-         * placed in the 'keys' struct passed into the sd_ble_gap_sec_params_reply() method.
-         * The next event to be signaled will be encryption.
-         * If already paired, this event will not be signaled
-         */
-        case BLE_GAP_EVT_AUTH_STATUS:
-        {
-            bsp_board_led_off(BSP_BOARD_BUTTON_3);
-            NRF_LOG_INFO("Pairing completed");
-        }
-        break;
-        
-        // For requesting pass keys - should not happen here.
-        case BLE_GAP_EVT_AUTH_KEY_REQUEST:
-
-            err_code = sd_ble_gap_auth_key_reply(p_ble_evt->evt.gap_evt.conn_handle, BLE_GAP_AUTH_KEY_TYPE_NONE, NULL);
+            // Encryption has been established
+            case BLE_GAP_EVT_CONN_SEC_UPDATE:
+            {
+                NRF_LOG_INFO("Encryption established");
+                hasEncrypted = true;
+            }
             break;
 
-        /* This event is signaled when encryption is being requested. Should only happen on a bonded reconnect. 
-         * Here the keys that are needed are those of the peripheral. The keys of the slave device are used */
-        case BLE_GAP_EVT_SEC_INFO_REQUEST:
-        {
-            NRF_LOG_INFO("Encryption request received");
-            flash_write_needed = false; // We already have our data.
-            ble_gap_evt_sec_info_request_t sec_info = p_ble_evt->evt.gap_evt.params.sec_info_request;
-            ble_gap_enc_info_t* enc_info = NULL;
-            ble_gap_irk_t* irk_info = NULL;
+            /* This event is signaled when pairing has completed. All the key information is
+             * placed in the 'keys' struct passed into the sd_ble_gap_sec_params_reply() method.
+             * The next event to be signaled will be encryption.
+             * If already paired, this event will not be signaled
+             */
+            case BLE_GAP_EVT_AUTH_STATUS:
+            {
+                bsp_board_led_off(BSP_BOARD_BUTTON_3);
+                NRF_LOG_INFO("Pairing completed");
+            }
+            break;
+        
+            // For requesting pass keys - should not happen here.
+            case BLE_GAP_EVT_AUTH_KEY_REQUEST:
 
-            if (sec_info.enc_info) // Set if peer is asked for the encryption info
+                err_code = sd_ble_gap_auth_key_reply(p_ble_evt->evt.gap_evt.conn_handle, BLE_GAP_AUTH_KEY_TYPE_NONE, NULL);
+                break;
+
+            /* This event is signaled when encryption is being requested. Should only happen on a bonded reconnect. 
+             * Here the keys that are needed are those of the peripheral. The keys of the slave device are used */
+            case BLE_GAP_EVT_SEC_INFO_REQUEST:
             {
-                enc_info = &keys.keys_own.p_enc_key->enc_info; // Keys created by the peripheral are used
+                NRF_LOG_INFO("Encryption request received");
+                flash_write_needed = false; // We already have our data.
+                ble_gap_evt_sec_info_request_t sec_info = p_ble_evt->evt.gap_evt.params.sec_info_request;
+                ble_gap_enc_info_t* enc_info = NULL;
+                ble_gap_irk_t* irk_info = NULL;
+
+                if (sec_info.enc_info) // Set if peer is asked for the encryption info
+                {
+                    enc_info = &keys.keys_own.p_enc_key->enc_info; // Keys created by the peripheral are used
+                }
+                if (sec_info.id_info) // Set if peer is asking for the IRK
+                {
+                    irk_info = &keys.keys_own.p_id_key->id_info;
+                }
+                err_code = sd_ble_gap_sec_info_reply(p_ble_evt->evt.gap_evt.conn_handle, enc_info, irk_info, NULL);
+                if (err_code != NRF_SUCCESS)
+                {
+                    NRF_LOG_ERROR("PAIRING INCONSISTENCY!! Client thinks it is paired with us but we have lost that pairing data. Error code: 0x%02X", err_code);
+                }
             }
-            if (sec_info.id_info) // Set if peer is asking for the IRK
-            {
-                irk_info = &keys.keys_own.p_id_key->id_info;
-            }
-            err_code = sd_ble_gap_sec_info_reply(p_ble_evt->evt.gap_evt.conn_handle, enc_info, irk_info, NULL);
-            if (err_code != NRF_SUCCESS)
-            {
-                NRF_LOG_ERROR("PAIRING INCONSISTENCY!! Client thinks it is paired with us but we have lost that pairing data. Error code: 0x%02X", err_code);
-            }
-        }
-        break;
+            break;
        #endif
 
 
@@ -1543,22 +1546,22 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                     #endif
                 }
                 #if (USES_STORED_DATA == 1)
-                else if (global_send.current_command == COMMAND_GET_ALL_STORED_RECORDS)
-                {
-                    global_send.number_of_groups--;
-                    if (global_send.number_of_groups > 0 && global_send.number_of_groups <= NUMBER_OF_STORED_MSMTS)
+                    else if (global_send.current_command == COMMAND_GET_ALL_STORED_RECORDS)
                     {
-                        NRF_LOG_DEBUG("----> Sending stored data element %u", (numberOfStoredMsmtGroups - global_send.number_of_groups));
-                        sendStoredMeasurements(numberOfStoredMsmtGroups - global_send.number_of_groups);
+                        global_send.number_of_groups--;
+                        if (global_send.number_of_groups > 0 && global_send.number_of_groups <= NUMBER_OF_STORED_MSMTS)
+                        {
+                            NRF_LOG_DEBUG("----> Sending stored data element %u", (numberOfStoredMsmtGroups - global_send.number_of_groups));
+                            sendStoredMeasurements(numberOfStoredMsmtGroups - global_send.number_of_groups);
+                        }
+                        else if (!stored_data_done_sent)
+                        {
+                            NRF_LOG_INFO("----> All stored data sent");
+                            createCpResponse(METCP_COMMAND_DONE, NULL);
+                            stored_data_done_sent = true;
+                            send_flag = true;
+                        }
                     }
-                    else if (!stored_data_done_sent)
-                    {
-                        NRF_LOG_INFO("----> All stored data sent");
-                        createCpResponse(METCP_COMMAND_DONE, NULL);
-                        stored_data_done_sent = true;
-                        send_flag = true;
-                    }
-                }
                 #endif
                 break;
             }
@@ -1575,14 +1578,14 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
             if (p_ble_evt->evt.gatts_evt.params.write.handle == m_met_cp_handle.cccd_handle)
             {
                 uint8_t write_data = p_ble_evt->evt.gatts_evt.params.write.data[0];
-                cccdSet[0] = (write_data == BLE_GATT_HVX_INDICATION);
+                cccdSet[COMMAND_CHAR] = (write_data == BLE_GATT_HVX_INDICATION);
                 NRF_LOG_INFO("Enabling MET CP CCCD with %d at time %u", write_data, getTicks());
             }
             // Enable IND or NOT Response
             else if (p_ble_evt->evt.gatts_evt.params.write.handle == m_met_response_handle.cccd_handle)
             {
                 uint8_t write_data = p_ble_evt->evt.gatts_evt.params.write.data[0];
-                cccdSet[1] = (write_data == 3) ? BLE_GATT_HVX_INDICATION : (write_data & 3);
+                cccdSet[RESPONSE_CHAR] = (write_data == 3) ? BLE_GATT_HVX_INDICATION : (write_data & 3);
                 NRF_LOG_INFO("Enabling MET Response CCCD with %d at time %u", write_data, getTicks());
             }
             // Command from control point
@@ -2088,7 +2091,7 @@ void main_wait(void)
 *   3. if the PHD does not support the command or the command is to get the number of stored
 *      records or delete stored data, there is only an indication on the CP with the result or DONE.
 
-* Pairing/bonding. This standard requires that the server put in the advertisment whether or not is
+* Pairing/bonding. This experimental protoype requires that the server put in the advertisment whether or not is
 * requires pairing. It also requires that if the server requires pairing that is secures writing to
 * the control point and response descriptors. The server shall not send a security request. The client
 * checks the advertisement and if pairing is required, on platforms that allow the application to initiate
@@ -2115,7 +2118,7 @@ static void main_loop(void)
         send_data();        // when flag is set, a set of data is indicated or notified depending upon setup. 
                                 // Flag is reset in method
         main_wait();            // Contains the sd_app_evt_wait()
-        if (!isEmpty(queue))
+        if (!isEmpty(queue))    // Anything to send?
         {
             void *data = front(queue);
             if (encodeMsmtData(data))

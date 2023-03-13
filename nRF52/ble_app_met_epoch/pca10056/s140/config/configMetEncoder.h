@@ -39,7 +39,7 @@
         [length | software] | [length | hardware] | length | UDI label | length | UDI Device Identifier | length | UDI issuer | length | UDI auth | AVAs]
 
         Measurements Packet:
-    command | header | Measurement-1 | Measurement-2 | … | Measurement-n
+    command | header | Measurement-1 | Measurement-2 |  | Measurement-n
     
         Header contents:
         flags | Length-of-PDU  |            Time-stamp            | Supplemental-types | references | duration | Person-id | AVAs | Group-id | Number-of-measurements |
@@ -69,7 +69,7 @@
  *   3. The measurements
  * This library allows you to configure the above parts for your device and generate a byte array that is to be
  * sent when needed. The measurement byte array is then updated as you receive measurement data from the sensor
- * with the new measurement values and timestamp (if you are including time stamps). In this standard measurements
+ * with the new measurement values and timestamp (if you are including time stamps). In this experimental protoype measurements
  * are grouped by time stamp. For example, a blood pressure cuff sending both blood pressure and pulse rate usually
  * sends the blood pressure and pulse rate with the same time stamp, and if you want to do that, you add both the
  * blood pressure and pulse rate to the same group. So on the wire the measurement would look as follows:
@@ -94,7 +94,7 @@
  *    diastolic, and mean components are treated as parts of a single measurement like the x, y, and z components of an acceleration. The reason
  *    for treating them as a vector was probably for efficiency and it now has become the norm and part of the BP standards. One could choose to
  *    send them as individal simple numerics (and some HL7 FHIR implementations treat them that way) and link them together. But now we follow the
- *    standard. To create this measurement we need to specify what our compound measurement contains. That is done by populating an array of s_Compound
+ *    experimental protoype. To create this measurement we need to specify what our compound measurement contains. That is done by populating an array of s_Compound
  *    structs as follows:
         s_Compound compounds[3];            // We want three; one each for the systolic, diastolic, and mean components:
         compounds[0].subType = MDC_PRESS_BLD_NONINV_SYS;    // This is a 32-bit unsigned integer which gives the MDC code for systolic blood pressure
@@ -119,7 +119,7 @@
                                            3,                       // The number of elements in the compound. In this case, there are three.
                                            compounds);              // A pointer to the array of s_Compound structs.
  *    For this implementation we want to tell the world that this blood pressure cuff is an upper arm cuff. Not many BP cuffs do that. In the Metric Model
- *    standard we can do this by including an extra MDC code in a field called 'supplemental types'. The Supplemental types allow one to say a lot of different
+ *    experimental protoype we can do this by including an extra MDC code in a field called 'supplemental types'. The Supplemental types allow one to say a lot of different
  *    things about the measurement, for example that it is an average, a maximum, that the sensor is placed on a certain location of the body, that a glucose
  *    measurement was taken by a tester and on the finger and it was bedtime, etc.
  *    To add a supplemental type to our measurement we call a method to set the number of supplemental types we intend to include. There are two possibilities;
@@ -220,7 +220,7 @@
     BT_SIG BP profile and even more efficient to use a proprietary profile customized for your device. However, special code has to be written for
     just those devices and the code written is not good for anything else.
 
-    Using the generic model means that clients need only be written once and they will work with this device and all devices following this standard.
+    Using the generic model means that clients need only be written once and they will work with this device and all devices following this experimental protoype.
     In addition, the codes used here are recognized by HL7 and IHE and puts your data immediately onto the international market.
 
     Furthermore. if you support more than one device type, this one code base will work for all your devices. One esentially gets all the other devices
@@ -234,7 +234,7 @@
 
 
  * GETTING SENSOR DATA INTO THE TEMPLATE (byte array)
- * We assume that data comes from the sensor through some type of interrupt or event via a UART or SPI. There is no standard interface to a sensor.
+ * We assume that data comes from the sensor through some type of interrupt or event via a UART or SPI. There is no experimental protoype interface to a sensor.
  * Instead, the application defines a structure which the application populates with the sensor data. When the data is received, the application
  * passes this data into the provided msmt_queue. The void* along with the structure size can take any structure. The app casts back when dequeing the data.
  * The data is then retrieved from the queue and the application needs to take the data in its structure and call the appropriate update*() methods.
@@ -242,7 +242,7 @@
  * part will be populating the MderFloat parameters since most people are not familiar with MderFloats. There are some BT SIG profiles that use MderFloats.
 
  * A similar approach is used to configure the the sMetTime properties, the current time info and the system info. The system info is the simplest
- * as it is required to be static in this standard and never has to be updated.
+ * as it is required to be static in this experimental protoype and never has to be updated.
  */
 //=========================================== METHODS ==========================================================
 /**
@@ -270,9 +270,9 @@ void cleanUpSystemInfoData(s_SystemInfoData** systemInfoData);
     void cleanUpTimeInfoData(s_TimeInfoData** timeInfoData);
 
 /**
- * This standard defines a current time and time stamp that contain a base epoch, a set of flags, an offset shift,
- * and a time sync. In binary form it is 10 bytes long. The set of flags indicate whether the resolution of the clock is
- * milliseconds or seconds. PHDs that require different resolutions cannot be supported by this standard (at the moment).
+ * This experimental protoype defines a current time and time stamp that contain a base epoch, a set of flags, an offset shift,
+ * and a time sync. In binary form it is 10 bytes long. The set of flags indicates whether the resolution of the clock is
+ * milliseconds, hundredths, tenths, or seconds. PHDs that require different resolutions cannot be supported by this experimental protoype.
 
  * Most PHDs are not able to support knowledge of the Offset shift from UTC to local time as
  * this knowledge requires the PHD to link to some external time source which for cost reasons is not done. The drawback

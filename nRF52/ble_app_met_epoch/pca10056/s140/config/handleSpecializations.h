@@ -12,10 +12,10 @@
  */
 #define BP_CUFF 0
 #define PULSE_OX 0
-#define GLUCOSE 0           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
+#define GLUCOSE 1           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
 #define HEART_RATE 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
 #define SPIROMETER 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
-#define SCALE 1
+#define SCALE 0
 #define THERMOMETER 0
 
 // Options:

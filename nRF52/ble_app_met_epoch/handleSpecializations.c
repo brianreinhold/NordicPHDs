@@ -79,7 +79,7 @@ unsigned long long epoch                        = 0;
 unsigned long long factor                       = 1L;
 
 // Needed just because we use the same board for different options with stored flash.
-// When the namekey is different than that in flahs, flash is not loaded
+// When the namekey is different than that in flash, flash is not loaded
 #if (BP_CUFF == 1)
     const char nameKey[10] = {'M', 'E', 'T', '_', 'B', 'P', ' ', ' ', ' ', ' '};
 #endif

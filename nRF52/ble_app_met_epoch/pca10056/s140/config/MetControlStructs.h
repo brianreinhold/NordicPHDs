@@ -254,7 +254,7 @@ typedef struct
 typedef struct
 {
     unsigned short timeFlagsSetTime;    // If equal to TIME_FLAGS_TIME_SET PHD has had its time set
-    unsigned short timeFlagsHasAvas;    // If equal to TIME_FLAGS_HAS_AVAS there are extra AVA structs at the end of the standard timeInfo byte array
+    unsigned short timeFlagsHasAvas;    // If equal to TIME_FLAGS_HAS_AVAS there are extra AVA structs at the end of the experimental protoype timeInfo byte array
     s_MetTime *metTime;                 // Pointer to an s_MetTime struct that needs to remain in scope
 } s_TimeInfo;
 
