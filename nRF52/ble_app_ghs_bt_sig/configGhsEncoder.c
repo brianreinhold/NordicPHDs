@@ -827,6 +827,32 @@ bool updateTimeStampEpoch(s_MsmtGroupData **msmtGroupDataPtr, unsigned long long
     return true;
 }
 
+bool updateTimeStampTimeline(s_MsmtGroupData **msmtGroupDataPtr, unsigned char onCurrentTimelineFlag)
+{
+    NRF_LOG_DEBUG("Update time stamp on current timeline setting 0x%02X", onCurrentTimelineFlag);
+    if (msmtGroupDataPtr == NULL || *msmtGroupDataPtr == NULL)
+    {
+        NRF_LOG_DEBUG("Input parameters were NULL.");
+        return false;
+    }
+    s_MsmtGroupData* msmtGroupData = *msmtGroupDataPtr;
+    unsigned short flags =  msmtGroupData->data[FLAGS_INDEX] & 0xFF + ((msmtGroupData->data[FLAGS_INDEX + 1] << 8) & 0xFF00);
+    if ((flags & FLAGS_HAS_TIMESTAMP) == FLAGS_HAS_TIMESTAMP)
+    {
+        msmtGroupData->data[TIMESTAMP_INDEX + GHS_TIME_INDEX_FLAGS] = 
+                (onCurrentTimelineFlag == GHS_TIME_FLAG_ON_CURRENT_TIMELINE) ?
+                   (msmtGroupData->data[TIMESTAMP_INDEX + GHS_TIME_INDEX_FLAGS] | GHS_TIME_FLAG_ON_CURRENT_TIMELINE) :
+                   (msmtGroupData->data[TIMESTAMP_INDEX + GHS_TIME_INDEX_FLAGS] & 0xDF);
+    }
+    else
+    {
+        NRF_LOG_DEBUG("Time stamps not supported or time stamp was NULL.");
+        return false;
+    }
+    *msmtGroupDataPtr = msmtGroupData;
+    return true;
+}
+
 bool updateTimeStampTimeSync(s_MsmtGroupData **msmtGroupDataPtr, unsigned short timeSync)
 {
     if (msmtGroupDataPtr == NULL || *msmtGroupDataPtr == NULL)

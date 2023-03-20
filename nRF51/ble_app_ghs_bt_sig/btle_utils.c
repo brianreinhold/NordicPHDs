@@ -619,7 +619,7 @@ ret_code_t createDeviceInformationService(unsigned short int *serviceHandle, s_S
         index = add_udi_entry(systemInfo->sUdi->udi_issuer_oid, index, udi);
         index = add_udi_entry(systemInfo->sUdi->udi_authority_oid, index, udi);
         memset(printBuf, 0, 1024);
-        NRF_LOG_INFO("UDI is %s", (uint32_t)byteToHex(udi, printBuf, " ", index));
+        NRF_LOG_INFO("UDI is %s\r\n", (uint32_t)byteToHex(udi, printBuf, " ", index));
         error_code = createStandardCharacteristic(*serviceHandle,
             &m_sUdi_handle,
             BTLE_DIS_UDI_CHAR,

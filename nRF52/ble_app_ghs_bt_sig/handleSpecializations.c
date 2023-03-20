@@ -1267,9 +1267,12 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
                         | msmt->status_movement),
                          msmt_id++);             // The instance number for the sensor status which is then incremented.
         }
-        updateTimeStampEpoch(&msmtGroupBpData, msmt->common.sGhsTime.epoch);  // Now we call the update method to populate the time stamp. In our fake
-                                                                     // data generator we get the current clock tick, add it to the base-epoch
-                                                                     // and place that into the bp measurement structure.
+        updateTimeStampEpoch(&msmtGroupBpData,   // Now we call the update method to populate the time stamp. In our fake
+            msmt->common.sGhsTime.epoch);        // data generator we get the current clock tick, add it to the base-epoch
+                                                 // and place that into the bp measurement structure.
+        updateTimeStampTimeline(&msmtGroupBpData,       // In this app so far a change in the timeline will only happen for stored data.
+            msmt->common.sGhsTime.flagKnownTimeline);   // when the DK powercycles. The timeline of the stored data will be lost
+                                                        // This method will capture the time line change.
         NRF_LOG_DEBUG("Bp msmt to send");       // Now we have the data array to send to the client. In the main for-loop the send-Flag has been
                                                 // set which will cause this data to be sent.
     #endif
@@ -1306,6 +1309,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
             updateDataNumeric(&msmtGroupSpotData, qual_index, &mder, msmt_id++);
             NRF_LOG_DEBUG("Spot msmt to send");
             updateTimeStampEpoch(&msmtGroupSpotData, msmt->common.sGhsTime.epoch);
+            updateTimeStampTimeline(&msmtGroupSpotData, msmt->common.sGhsTime.flagKnownTimeline);
         }
     #endif
     #if (GLUCOSE == 1)
@@ -1334,6 +1338,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
         mder.mantissa = msmt->exer;
         updateDataNumeric(&msmtGroupGlucData, exer_index, &mder, msmt_id++);
         updateTimeStampEpoch(&msmtGroupGlucData, msmt->common.sGhsTime.epoch);
+        updateTimeStampTimeline(&msmtGroupGlucData, msmt->common.sGhsTime.flagKnownTimeline);
         NRF_LOG_DEBUG("Bp msmt to send");
     #endif
     #if (HEART_RATE == 1)
@@ -1488,6 +1493,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
         mder.mantissa = msmt->ambient;
         updateDataNumeric(&msmtGroupTempData, ambient_index, &mder, msmt_id++);
         updateTimeStampEpoch(&msmtGroupTempData, msmt->common.sGhsTime.epoch);
+        updateTimeStampTimeline(&msmtGroupTempData, msmt->common.sGhsTime.flagKnownTimeline);
         NRF_LOG_DEBUG("Temperature msmt to send");
     #endif  // Ear thermometer
     #if (SCALE == 1)
@@ -1508,6 +1514,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
             mder.mantissa = bmi;
             updateDataNumeric(&msmtGroupScaleData, bmi_index, &mder, msmt_id);  // Not using msmt_id - don't increment
             updateTimeStampEpoch(&msmtGroupScaleData, msmt->common.sGhsTime.epoch);
+            updateTimeStampTimeline(&msmtGroupScaleData, msmt->common.sGhsTime.flagKnownTimeline);
             NRF_LOG_DEBUG("Weight msmt to send with mass %lu div %lu bmi %lu", msmt->mass, div, bmi);
         }
         else

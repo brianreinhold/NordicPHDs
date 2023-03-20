@@ -119,6 +119,9 @@
 #define GHS_TIME_FLAG_ON_CURRENT_TIMELINE 0x20 // 0010 0000
 #define GHS_TIME_OFFSET_UNSUPPORTED 0x80
 
+#define GHS_TIME_ERROR_TIME_SYNC_TOO_POOR 0x80
+#define GHS_TIME_ERROR_INCORRECT_FORMAT 0x81
+
 // The factor values convert our 32768 ticks per second RTC to one of the supported resolutions
 //#define FACTOR 10000L   // For milliseconds/10
 //#define FACTOR 1000L    // For milliseconds

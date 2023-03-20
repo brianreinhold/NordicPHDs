@@ -204,7 +204,7 @@ unsigned short security_char_length = 2;
 #if (SPIROMETER == 1)
     const char nameKey[10] = {'G', 'H', 'S', '_', 'S', 'P', 'I', 'R', ' ', ' '};
     unsigned char feature[82] = {FEATURE_HAS_DEVICE_SPECIALIZATIONS, 
-              4,  0x14, 0x78, 0x80, 0x00, 0x7E, 0x00, 0x81, 0x00, 0x40, 0xE1, 0x02, 0x00,  // MDC_DIAG_SESSION_SPIRO, MDC_HF_AGE, MDC_MASS_BODY_ACTUAL
+           0x13,  0x14, 0x78, 0x80, 0x00, 0x7E, 0x00, 0x81, 0x00, 0x40, 0xE1, 0x02, 0x00,  // MDC_DIAG_SESSION_SPIRO, MDC_HF_AGE, MDC_MASS_BODY_ACTUAL
                   0x44, 0xE1, 0x02, 0x00, 0x64, 0x78, 0x80, 0x00, 0x82, 0x78, 0x80, 0x00,  // MDC_LEN_BODY_ACTUAL, MDC_ETHNICITY, MDC_BIRTH_SEX
                   0x17, 0x78, 0x80, 0x00, 0xD4, 0x50, 0x02, 0x00, 0xD4, 0x50, 0x02, 0x00,  // MDC_DIAG_SUB_SESSION_SPIRO_MANEUVER_STANDING, MDC_FLOW_AWAY, 
                   0x0A, 0x54, 0x02, 0x00, 0x0B, 0x54, 0x02, 0x00, 0x00, 0xE2, 0x02, 0x00,  // MDC_VOL_AWAY_EXP_FORCED_1S, MDC_VOL_AWAY_EXP_FORCED_6S, MDC_VOL_AWAY_EXP_FORCED_CAPACITY
@@ -1265,9 +1265,12 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
                         | msmt->status_movement),
                          msmt_id++);             // The instance number for the sensor status which is then incremented.
         }
-        updateTimeStampEpoch(&msmtGroupBpData, msmt->common.sGhsTime.epoch);  // Now we call the update method to populate the time stamp. In our fake
-                                                                     // data generator we get the current clock tick, add it to the base-epoch
-                                                                     // and place that into the bp measurement structure.
+        updateTimeStampEpoch(&msmtGroupBpData,   // Now we call the update method to populate the time stamp. In our fake
+            msmt->common.sGhsTime.epoch);        // data generator we get the current clock tick, add it to the base-epoch
+                                                 // and place that into the bp measurement structure.
+        updateTimeStampTimeline(&msmtGroupBpData,       // In this app so far a change in the timeline will only happen for stored data.
+            msmt->common.sGhsTime.flagKnownTimeline);   // when the DK powercycles. The timeline of the stored data will be lost
+                                                        // This method will capture the time line change.
         NRF_LOG_DEBUG("Bp msmt to send");       // Now we have the data array to send to the client. In the main for-loop the send-Flag has been
                                                 // set which will cause this data to be sent.
     #endif
@@ -1304,6 +1307,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
             updateDataNumeric(&msmtGroupSpotData, qual_index, &mder, msmt_id++);
             NRF_LOG_DEBUG("Spot msmt to send");
             updateTimeStampEpoch(&msmtGroupSpotData, msmt->common.sGhsTime.epoch);
+            updateTimeStampTimeline(&msmtGroupSpotData, msmt->common.sGhsTime.flagKnownTimeline);
         }
     #endif
     #if (GLUCOSE == 1)
@@ -1332,6 +1336,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
         mder.mantissa = msmt->exer;
         updateDataNumeric(&msmtGroupGlucData, exer_index, &mder, msmt_id++);
         updateTimeStampEpoch(&msmtGroupGlucData, msmt->common.sGhsTime.epoch);
+        updateTimeStampTimeline(&msmtGroupGlucData, msmt->common.sGhsTime.flagKnownTimeline);
         NRF_LOG_DEBUG("Bp msmt to send");
     #endif
     #if (HEART_RATE == 1)
@@ -1489,6 +1494,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
         mder.mantissa = msmt->ambient;
         updateDataNumeric(&msmtGroupTempData, ambient_index, &mder, msmt_id++);
         updateTimeStampEpoch(&msmtGroupTempData, msmt->common.sGhsTime.epoch);
+        updateTimeStampTimeline(&msmtGroupTempData, msmt->common.sGhsTime.flagKnownTimeline);
         NRF_LOG_DEBUG("Temperature msmt to send");
     #endif  // Ear thermometer
     #if (SCALE == 1)
@@ -1509,6 +1515,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
             mder.mantissa = bmi;
             updateDataNumeric(&msmtGroupScaleData, bmi_index, &mder, msmt_id);  // Not using msmt_id - don't increment
             updateTimeStampEpoch(&msmtGroupScaleData, msmt->common.sGhsTime.epoch);
+            updateTimeStampTimeline(&msmtGroupScaleData, msmt->common.sGhsTime.flagKnownTimeline);
             NRF_LOG_DEBUG("Weight msmt to send with mass %lu div %lu bmi %lu", msmt->mass, div, bmi);
         }
         else
@@ -1548,21 +1555,22 @@ void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.clockResolution = sGhsTime->clockResolution;
         storedMsmts[numberOfStoredMsmtGroups].systolic = 95 + (timeStamp & 0x0F);
         storedMsmts[numberOfStoredMsmtGroups].diastolic = 55 + (timeStamp & 0x0F);
-        storedMsmts[numberOfStoredMsmtGroups].hasStatus = false;
         storedMsmts[numberOfStoredMsmtGroups].mean = 
             (storedMsmts[numberOfStoredMsmtGroups].systolic +
              storedMsmts[numberOfStoredMsmtGroups].diastolic) / 2;
+        storedMsmts[numberOfStoredMsmtGroups].hasStatus = ((storedMsmts[numberOfStoredMsmtGroups].mean & 0x01) == 0x01);
         storedMsmts[numberOfStoredMsmtGroups].pulseRate = 40 + (timeStamp & 0x07);
-        unsigned short stat = ((timeStamp & 0x1FB) << 7);
-     //   storedMsmts[numberOfStoredMsmtGroups].status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
-     //   storedMsmts[numberOfStoredMsmtGroups].status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
-     //   storedMsmts[numberOfStoredMsmtGroups].status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
-     //   storedMsmts[numberOfStoredMsmtGroups].status_movement = (stat & BP_STATUS_MOVEMENT);
-        NRF_LOG_INFO("Measurement added: sys %u, dia %u, mean %u, PR %u, timestamp %lu\r\n", 
+        unsigned short stat = (timeStamp & 0x3F);
+        storedMsmts[numberOfStoredMsmtGroups].status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
+        storedMsmts[numberOfStoredMsmtGroups].status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
+        storedMsmts[numberOfStoredMsmtGroups].status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
+        storedMsmts[numberOfStoredMsmtGroups].status_movement = (stat & BP_STATUS_MOVEMENT);
+        NRF_LOG_INFO("Measurement added: sys %u, dia %u, mean %u, PR %u, status %u, timestamp %lu\r\n", 
                 storedMsmts[numberOfStoredMsmtGroups].systolic,
                 storedMsmts[numberOfStoredMsmtGroups].diastolic,
                 storedMsmts[numberOfStoredMsmtGroups].mean,
-                storedMsmts[numberOfStoredMsmtGroups].pulseRate, 
+                storedMsmts[numberOfStoredMsmtGroups].pulseRate,
+                storedMsmts[numberOfStoredMsmtGroups].hasStatus,
                 timeStamp);
     #endif
     #if (PULSE_OX == 1)
@@ -1580,7 +1588,7 @@ void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         storedMsmts[numberOfStoredMsmtGroups].pulseRate = 45 + (timeStamp & 0x07);
         storedMsmts[numberOfStoredMsmtGroups].pulseQuality = 523 + (timeStamp & 0xFF);
 
-        NRF_LOG_INFO("Measurement added: SpO2 %u%, PR %u, Pulsatile X 100 %u%, timestamp %lu", 
+        NRF_LOG_INFO("Measurement added: SpO2 %u%, PR %u, Pulsatile X 100 %u%, timestamp %lu\r\n", 
             storedMsmts[numberOfStoredMsmtGroups].spo2, 
             storedMsmts[numberOfStoredMsmtGroups].pulseRate, 
             storedMsmts[numberOfStoredMsmtGroups].pulseQuality, timeStamp);
@@ -1606,7 +1614,7 @@ void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         storedMsmts[numberOfStoredMsmtGroups].meds = 100 + (timeStamp & 0x0F); // IU times 10
         storedMsmts[numberOfStoredMsmtGroups].medication_type = MDC_CTXT_MEDICATION_RAPIDACTING + (timeStamp & 0x03) * 4;
         storedMsmts[numberOfStoredMsmtGroups].exer = 60 + (timeStamp & 0x1F);
-        NRF_LOG_INFO("Measurement added: conc %u, carbs %u, meds %u, exer %u, timestamp %lu", 
+        NRF_LOG_INFO("Measurement added: conc %u, carbs %u, meds %u, exer %u, timestamp %lu\r\n", 
                 storedMsmts[numberOfStoredMsmtGroups].conc,
                 storedMsmts[numberOfStoredMsmtGroups].carbs,
                 storedMsmts[numberOfStoredMsmtGroups].meds,
@@ -1625,7 +1633,7 @@ void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         storedMsmts[numberOfStoredMsmtGroups].common.sGhsTime.timeSync = sGhsTime->timeSync;
         storedMsmts[numberOfStoredMsmtGroups].mass = 6800 + (timeStamp & 0xFF);
 
-        NRF_LOG_INFO("Measurement added: Weight %u%, timestamp %lu", 
+        NRF_LOG_INFO("Measurement added: Weight %u%, timestamp %lu\r\n", 
             storedMsmts[numberOfStoredMsmtGroups].mass, timeStamp);
     #endif
     #if (THERMOMETER == 1)
@@ -1641,7 +1649,7 @@ void generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
         storedMsmts[numberOfStoredMsmtGroups].temp = 9800 + (timeStamp & 0xFF);
         storedMsmts[numberOfStoredMsmtGroups].ambient = 7200 + (timeStamp & 0x1FF);
 
-        NRF_LOG_INFO("Measurement added: Temperature %u%, ambient temperature %u, timestamp %lu", 
+        NRF_LOG_INFO("Measurement added: Temperature %u%, ambient temperature %u, timestamp %lu\r\n", 
             storedMsmts[numberOfStoredMsmtGroups].temp, storedMsmts[numberOfStoredMsmtGroups].ambient, timeStamp);
     #endif
     // No stored data generated for Spirometer
@@ -1782,14 +1790,25 @@ void sendStoredSpecializationMsmts(unsigned short stored_count)
 {
     // Set up parameters for notification of this PDU - likely in fragments
     #if (BP_CUFF == 1)
-        NRF_LOG_DEBUG("Stored Measurements added to queue: sys %u, dia %u, mean %u, PR %u, count %d", 
+        NRF_LOG_DEBUG("Stored Measurements added to queue: sys %u, dia %u, mean %u, PR %u, count %d, status %u\r\n", 
             storedMsmts[stored_count].systolic,
             storedMsmts[stored_count].diastolic,
             storedMsmts[stored_count].mean,
             storedMsmts[stored_count].pulseRate,
-            stored_count);
+            stored_count,
+            storedMsmts[stored_count].hasStatus);
         if(sd_mutex_acquire(&q_mutex) != NRF_ERROR_SOC_MUTEX_ALREADY_TAKEN)
         {
+            if (storedMsmts[stored_count].hasStatus && !reportStatus)
+            {
+                updateDataRestoreLastMsmt(&msmtGroupBpData);
+                reportStatus = true;
+            }
+            else if (!storedMsmts[stored_count].hasStatus && reportStatus)
+            {
+                updateDataDropLastMsmt(&msmtGroupBpData);
+                reportStatus = false;
+            }
             enqueue(queue, &storedMsmts[stored_count], sizeof(s_MsmtData));
             sd_mutex_release(&q_mutex);
         }
@@ -1895,17 +1914,18 @@ void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned 
             bpMsmt.status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
             bpMsmt.status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
             bpMsmt.status_movement = (stat & BP_STATUS_MOVEMENT);
-            if (bpMsmt.hasStatus)
+            if (bpMsmt.hasStatus && !reportStatus)
             {
                 updateDataRestoreLastMsmt(&msmtGroupBpData);
+                reportStatus = true;
             }
-            else
+            else if (!bpMsmt.hasStatus && reportStatus)
             {
                 updateDataDropLastMsmt(&msmtGroupBpData);
+                reportStatus = false;
             }
-            //reportStatus = !reportStatus;
 
-            NRF_LOG_INFO("Measurement added to queue: sys %u, dia %u, mean %u, PR %u, status: %u", 
+            NRF_LOG_INFO("Measurement added to queue: sys %u, dia %u, mean %u, PR %u, status: %u\r\n", 
                 bpMsmt.systolic,
                 bpMsmt.diastolic,
                 bpMsmt.mean,
@@ -2054,18 +2074,23 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
     // we adjust the time stamps of all our stored data to the new timeline. THat will
     // involve updating the epoch field of the stored time stamp by the difference and
     // and changing the time sync to that specified in the set time.
+
+    NRF_LOG_INFO("Doing date time adjustment of %lld on stored data\r\n", diff);
     for (i = 0; i < numberOfStoredMsmtGroups; i++)
     {
+         NRF_LOG_DEBUG("msmt %u timeline %u\r\n", i, storedMsmts[i].common.sGhsTime.flagKnownTimeline);
          if (storedMsmts[i].common.sGhsTime.flagKnownTimeline == GHS_TIME_FLAG_ON_CURRENT_TIMELINE)
          {
              storedMsmts[i].common.sGhsTime.epoch = (diff < 0) ? storedMsmts[i].common.sGhsTime.epoch - udiff
                         : storedMsmts[i].common.sGhsTime.epoch + diff;
              storedMsmts[i].common.sGhsTime.timeSync = timeSync;
+             initialNumberOfStoredMsmtGroups = 0; // This will assure flash gets written
+             NRF_LOG_DEBUG("Updated time on msmt %u ", i);
          }
     }
 }
 
-void setNotOnCurrentTimeline(unsigned long long newCount)
+void setNotOnCurrentTimeline(void)
 {
     int i;
     for (i = 0; i < numberOfStoredMsmtGroups; i ++)
@@ -2115,5 +2140,28 @@ void cleanUpSpecializations(void)
         cleanUpGhsTime(&sGhsTime);
         cleanUpTimeInfoData(&sTimeInfoData);
         cleanUpTimeInfo(&sTimeInfo);
+    #endif
+}
+
+void reset_specializations(void)
+{
+    #if (BP_CUFF == 1)
+    #endif
+
+    #if (PULSE_OX == 1)
+    #endif
+    #if (GLUCOSE == 1)
+    #endif
+    #if (HEART_RATE == 1)
+    #endif
+    #if (SPIROMETER == 1)
+        spiro_sequence = 0;
+    #endif
+    #if (SCALE == 1)
+        scale_sequence = 0;
+    #endif
+    #if (THERMOMETER == 1)
+    #endif
+    #if (USES_TIMESTAMP == 1)
     #endif
 }

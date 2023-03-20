@@ -219,7 +219,8 @@ unsigned short getNumberOfStoredRecords(unsigned char* cmd, unsigned short len);
 long getStartIndexInStoredRecords(unsigned char* cmd, unsigned short len);
 bool encodeSpecializationMsmts(s_MsmtData *msmt);
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp);
-void setNotOnCurrentTimeline(unsigned long long newCount);
+void setNotOnCurrentTimeline(void);
 void cleanUpSpecializations(void);
+void reset_specializations(void);
 
 #endif
