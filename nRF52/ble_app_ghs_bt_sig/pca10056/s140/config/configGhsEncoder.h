@@ -259,10 +259,10 @@ void cleanUpTimeInfoData(s_TimeInfoData** timeInfoData);
 
  * @param timeInfo pointer to an s_TimeInfo *struct pointer. This method will populate it. The pointer must remain in scope
  * @param sGhsTime a pointer to s_GhsTime struct created by the createGhsTime method. Set to NULL if there are no time stamps in any measurements
- * @param allowSetTime true if PHD clock can be set. Applies only to absolute and base offset times. Ignored otherwise
+ * @param wantSetTime true if PHD wants time to be set. Ignored otherwise
  * @returns true if there are no problems.
  */
-bool createTimeInfo(s_TimeInfo **sTimeInfo, s_GhsTime *sGhsTime, bool allowSetTime);
+bool createTimeInfo(s_TimeInfo **sTimeInfo, s_GhsTime *sGhsTime, bool wantSetTime);
 
 /**
  * This method generates the time info byte array to be sent to the client when the client asks for it. The only thing that will

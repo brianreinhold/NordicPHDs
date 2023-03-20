@@ -197,7 +197,7 @@ static bool checkMsmtGroupData(s_MsmtGroupData* msmtGroupData)
     }
 
 
-    bool createTimeInfo(s_TimeInfo **sTimeInfoPtr, s_GhsTime *sGhsTime, bool allowSetTime)
+    bool createTimeInfo(s_TimeInfo **sTimeInfoPtr, s_GhsTime *sGhsTime, bool wantSetTime)
     {
         s_TimeInfo* sTimeInfo = *sTimeInfoPtr;
         if (sTimeInfo != NULL)
@@ -212,7 +212,7 @@ static bool checkMsmtGroupData(s_MsmtGroupData* msmtGroupData)
         }
         if (sGhsTime != NULL)
         {
-            sTimeInfo->timeFlagsSetTime = allowSetTime ? TIME_FLAGS_SUPPORTS_SET_TIME : 0;
+            sTimeInfo->timeFlagsWantSetTime = wantSetTime ? TIME_FLAGS_WANT_SET_TIME : 0;
             sTimeInfo->ghsTime = sGhsTime;
         }
         *sTimeInfoPtr = sTimeInfo;
@@ -265,7 +265,7 @@ static bool checkMsmtGroupData(s_MsmtGroupData* msmtGroupData)
         timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_TIME_SYNC] = sTimeInfo->ghsTime->timeSync;
         timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_OFFSET] = (unsigned char)(sTimeInfo->ghsTime->offsetShift & 0xFF);
         timeInfoData->flags_index = index + TIME_STAMP_LENGTH;
-        timeInfoData->timeInfoBuf[index + TIME_STAMP_LENGTH] = (unsigned char)sTimeInfo->timeFlagsSetTime;
+        timeInfoData->timeInfoBuf[index + TIME_STAMP_LENGTH] = (unsigned char)sTimeInfo->timeFlagsWantSetTime;
         timeInfoData->timeInfoBuf[index + TIME_STAMP_LENGTH + 1] = 0;       // No capabilties yet
 
         *timeInfoDataPtr = timeInfoData;
@@ -285,11 +285,12 @@ static bool checkMsmtGroupData(s_MsmtGroupData* msmtGroupData)
         int index = timeInfoData->currentTime_index;
         memcpy(&timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_EPOCH], &update[GHS_TIME_INDEX_EPOCH], 6);                   // PHG's Epoch
         // flags field left alone
-        if ((timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_FLAGS] & GHS_TIME_FLAG_SUPPORTS_TIMEZONE) == GHS_TIME_FLAG_SUPPORTS_TIMEZONE)    // Set to PHG's offset if PHD supports Offset
+        if ((timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_CAPS] & GHS_TIME_FLAG_SUPPORTS_TIMEZONE) == GHS_TIME_FLAG_SUPPORTS_TIMEZONE)    // Set to PHG's offset if PHD supports Offset
         {
             timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_OFFSET] = update[GHS_TIME_INDEX_OFFSET];
         }
         timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_TIME_SYNC] = update[GHS_TIME_INDEX_TIME_SYNC];
+        timeInfoData->timeInfoBuf[index + GHS_TIME_INDEX_STATUS] = 0;  // Clear want to set time bit
         *timeInfoDataPtr = timeInfoData;
         return true;
     }

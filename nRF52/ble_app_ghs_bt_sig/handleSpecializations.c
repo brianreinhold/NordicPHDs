@@ -76,8 +76,9 @@ bool reportStatus = true;                           // used in BP for device sta
  * time by the PHG. We add the current tick counter to this base epoch to report our current
  * time and time stamps.
  */
-unsigned long long epoch                        = 0;
-unsigned long long factor                       = 1000L; // milliseconds
+unsigned long long epoch                        = 0LL;
+unsigned long long factor                       = 1000L; // milliseconds default
+
 
 
 /*
@@ -725,7 +726,7 @@ void configureSpecializations(void)
                                                     // for the structure and is populated by this method.
                             sGhsTime,               // A pointer to the s_GhsTime struct that we populated earlier. If we don't want to 
                                                     // support a time clock at all, this parameter shall be NULL.
-                            true);                  // When 'true' we support the set time operation. This value is ignored for relative times
+                            true);                 // When 'true' we want the client to set the time. This value is ignored for relative times
                                                     // and no times.
         result = createCurrentTimeDataBuffer(&sTimeInfoData, sTimeInfo);  // This method creates the time info data array structure from 
                                                                       // the s_TimeInfo struct. We will need to populate the current time
@@ -1534,8 +1535,6 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
 bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long timeStamp, unsigned short numberOfStoredMsmtGroups)
 {
     #if (BP_CUFF == 1)
-                char buffer[512];
-                memset(buffer, 0, 512);
         storedMsmts[numberOfStoredMsmtGroups].common.hasTimeStamp = true;
         storedMsmts[numberOfStoredMsmtGroups].common.isStoredData = true;
         storedMsmts[numberOfStoredMsmtGroups].common.recordNumber = recordNumber++;
@@ -1551,12 +1550,15 @@ bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long ti
             (storedMsmts[numberOfStoredMsmtGroups].systolic +
              storedMsmts[numberOfStoredMsmtGroups].diastolic) / 2;
         storedMsmts[numberOfStoredMsmtGroups].pulseRate = 40 + (timeStamp & 0x07);
-        unsigned short stat = ((timeStamp & 0x1FB) << 7);
-        storedMsmts[numberOfStoredMsmtGroups].hasStatus = ((storedMsmts[numberOfStoredMsmtGroups].systolic & 0x01) == 0x01);
-        storedMsmts[numberOfStoredMsmtGroups].status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
-        storedMsmts[numberOfStoredMsmtGroups].status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
-        storedMsmts[numberOfStoredMsmtGroups].status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
-        storedMsmts[numberOfStoredMsmtGroups].status_movement = (stat & BP_STATUS_MOVEMENT);
+        storedMsmts[numberOfStoredMsmtGroups].hasStatus = ((storedMsmts[numberOfStoredMsmtGroups].mean & 0x01) == 0x01);
+        if (storedMsmts[numberOfStoredMsmtGroups].hasStatus)
+        {
+            unsigned short stat = (timeStamp & 0x3F);
+            storedMsmts[numberOfStoredMsmtGroups].status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
+            storedMsmts[numberOfStoredMsmtGroups].status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
+            storedMsmts[numberOfStoredMsmtGroups].status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
+            storedMsmts[numberOfStoredMsmtGroups].status_movement = (stat & BP_STATUS_MOVEMENT);
+        }
         NRF_LOG_INFO("Measurement added: sys %u, dia %u, mean %u, PR %u, timestamp %llu", 
                 storedMsmts[numberOfStoredMsmtGroups].systolic,
                 storedMsmts[numberOfStoredMsmtGroups].diastolic,
@@ -1773,7 +1775,7 @@ long getStartIndexInStoredRecords(unsigned char* cmd, unsigned short len)
         
         case RACP_LAST:
             return numberOfStoredMsmtGroups - 1;
-        
+
         default:
             return -1;
     }
@@ -1787,14 +1789,25 @@ void sendStoredSpecializationMsmts(unsigned short stored_count)
 {
     // Set up parameters for notification of this PDU - likely in fragments
     #if (BP_CUFF == 1)
-        NRF_LOG_DEBUG("Stored Measurements added to queue: sys %u, dia %u, mean %u, PR %u, count %d", 
+        NRF_LOG_DEBUG("Stored Measurements added to queue: sys %u, dia %u, mean %u, PR %u, has status %u, count %d", 
             storedMsmts[stored_count].systolic,
             storedMsmts[stored_count].diastolic,
             storedMsmts[stored_count].mean,
             storedMsmts[stored_count].pulseRate,
+            storedMsmts[stored_count].hasStatus,
             stored_count);
         if(sd_mutex_acquire(&q_mutex) != NRF_ERROR_SOC_MUTEX_ALREADY_TAKEN)
         {
+            if (storedMsmts[stored_count].hasStatus && !reportStatus)
+            {
+                updateDataRestoreLastMsmt(&msmtGroupBpData);
+                reportStatus = true;
+            }
+            else if (!storedMsmts[stored_count].hasStatus && reportStatus)
+            {
+                updateDataDropLastMsmt(&msmtGroupBpData);
+                reportStatus = false;
+            }
             enqueue(queue, &storedMsmts[stored_count], sizeof(s_MsmtData));
             sd_mutex_release(&q_mutex);
         }
@@ -1895,18 +1908,23 @@ void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned 
             bpMsmt.common.sGhsTime.flagKnownTimeline = GHS_TIME_FLAG_ON_CURRENT_TIMELINE;
             bpMsmt.common.sGhsTime.offsetShift = sGhsTime->offsetShift;
             bpMsmt.common.sGhsTime.timeSync = sGhsTime->timeSync;
-            unsigned short stat = (timeStamp & 0x3F);
-            bpMsmt.status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
-            bpMsmt.status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
-            bpMsmt.status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
-            bpMsmt.status_movement = (stat & BP_STATUS_MOVEMENT);
             if (bpMsmt.hasStatus)
             {
-                updateDataRestoreLastMsmt(&msmtGroupBpData);
+                unsigned short stat = (timeStamp & 0x3F);
+                bpMsmt.status_cuff_too_loose = (stat & BP_STATUS_CUFF_TOO_LOOSE);
+                bpMsmt.status_improper_position = (stat & BP_STATUS_IMPROPER_POSITION);
+                bpMsmt.status_irregular_pulse = (stat & BP_STATUS_IRREGULAR_PULSE);
+                bpMsmt.status_movement = (stat & BP_STATUS_MOVEMENT);
             }
-            else
+            if (bpMsmt.hasStatus && !reportStatus)
+            {
+                updateDataRestoreLastMsmt(&msmtGroupBpData);
+                reportStatus = true;
+            }
+            else if (!bpMsmt.hasStatus && reportStatus)
             {
                 updateDataDropLastMsmt(&msmtGroupBpData);
+                reportStatus = false;
             }
             //reportStatus = !reportStatus;
 
@@ -2055,13 +2073,17 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
     // involve updating the epoch field of the stored time stamp by the difference and
     // and changing the time sync to that specified in the set time.
     #if (USES_STORED_DATA == 1)
+        NRF_LOG_INFO("Doing date time adjustment of %lld on stored data", diff);
         for (i = 0; i < numberOfStoredMsmtGroups; i++)
         {
+             NRF_LOG_DEBUG("msmt %u timeline %u", i, storedMsmts[i].common.sGhsTime.flagKnownTimeline);
              if (storedMsmts[i].common.sGhsTime.flagKnownTimeline == GHS_TIME_FLAG_ON_CURRENT_TIMELINE)
              {
                  storedMsmts[i].common.sGhsTime.epoch = (diff < 0) ? storedMsmts[i].common.sGhsTime.epoch - udiff
                             : storedMsmts[i].common.sGhsTime.epoch + diff;
                  storedMsmts[i].common.sGhsTime.timeSync = timeSync;
+                 initialNumberOfStoredMsmtGroups = 0; // This will assure flash gets written
+                 NRF_LOG_DEBUG("Updated time on msmt %u ", i);
              }
         }
     #endif

@@ -195,7 +195,7 @@ static ble_gap_sec_keyset_t     keys;
 static uint16_t                 saveDataLength                  = 0;
 static uint8_t                  *saveDataBuffer                 = NULL;
 static volatile bool            restartAdv                      = false;
-static uint8_t                  frag_header                     = 0;
+static uint8_t                  frag_header                     = 0xFC;
 static unsigned char            charBuff[8];
 static unsigned char            racp_request;
 unsigned short                  num_records_to_send             = 0;
@@ -253,15 +253,15 @@ unsigned char DELETE_RECORDS_RESP_SUCCESS[4]          = {0x06, 0x00, 0x02, 0x01}
 unsigned char RESP_NO_RECORDS[4]                = {0x06, 0x00, 0x00, 0x06};  // need to fill [2] with the op-code (01 for get records, 07 for combo, 02 for delete)
 unsigned char RESP_OPCODE_UNSUPPORTED[4]        = {0x06, 0x00, 0x00, 0x02};  // need to fill [2] with the op-code
 unsigned char RESP_OPER_UNSUPPORTED[4]          = {0x06, 0x00, 0x00, 0x04};  // need to fill [2] with the op-code
-unsigned char RESP_REJECTED[4]                  = {0x06, 0x00, 0x00, 0x08};  // need to fill [2] with the op-code
+unsigned char RESP_SERVER_BUSY[4]                  = {0x06, 0x00, 0x00, 0x0A};  // need to fill [2] with the op-code
 
 //unsigned char MSMT_RECORD_COMPLETED[2] = {0xFF, 0xFF};
 //unsigned char SENSOR_DONE[2]           = {0xFF, 0xFE};
 
 // For live data CP
 unsigned char GHSCP_RSP_SUCCESS[1] =  {0x80};
-unsigned char GHSCP_RSP_BUSY[1] = {0x81};
-unsigned char GHSCP_RSP_LIVE_CCCD_DISABLED[1] = {0x82};
+unsigned char GHSCP_RSP_BUSY[1] = {0x81};  // BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG
+unsigned char GHSCP_RSP_LIVE_CCCD_DISABLED[1] = {0x82}; // BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR
 unsigned char GHSCP_RSP_UNKNOWN_COMMAND[1] = {0x83};
 
 // Time clock
@@ -638,6 +638,7 @@ static void getCurrentTime()
 
 static void ghscp_handler(unsigned char *cmd, unsigned short len);
 static void racp_handler(unsigned char *cmd, unsigned short len);
+static void handleSetTime(unsigned char *setTime);
 
 static bool do_read_request(ble_evt_t * p_ble_evt)
 {
@@ -710,7 +711,7 @@ static bool do_read_request(ble_evt_t * p_ble_evt)
     }
     else if (auth.type == BLE_GATTS_AUTHORIZE_TYPE_WRITE)
     {
-        NRF_LOG_DEBUG("Write authorized request at time %u\n", getTicks());
+        NRF_LOG_DEBUG("Write authorized request at time %u", getTicks());
         ret_code_t err_code;
         ble_gatts_rw_authorize_reply_params_t reply;
         memset(&reply, 0, sizeof(ble_gatts_rw_authorize_reply_params_t));
@@ -730,38 +731,84 @@ static bool do_read_request(ble_evt_t * p_ble_evt)
                     NRF_LOG_ERROR("RW RACP reply gave error %u:", err_code);
                 }
                 current_char_handle = m_racp_handle.value_handle;
-                racp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, 
-                                p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
+                racp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
                 return true;
             }
             else
             {
+                NRF_LOG_ERROR("Client has not enabled the RACP characteristic");
                 reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR;
             }
         }
         // Command from GHS Control Point
         else if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.handle == m_ghs_bt_sig_cp_handle.value_handle)
         {
-            if (cccdSet[GHS_CP_CCCD_INDEX])
+            if (racp_mode)
+            {
+                reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG;
+            }
+            else if (cccdSet[GHS_CP_CCCD_INDEX])
             {
                 reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
                 reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
                 reply.params.write.update = 1;
                 reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
                 reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
-                current_char_handle = m_ghs_bt_sig_cp_handle.value_handle;
+                current_char_handle = m_ghs_bt_sig_live_data_not_handle.value_handle;  // NEEDED FOR THE SEND_DATA method!!
                 err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
                 if (err_code != NRF_SUCCESS)
                 {
                     NRF_LOG_ERROR("RW GHS CP reply gave error %u:", err_code);
                 }
-                ghscp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, 
-                    p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
+                ghscp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
                 return true;
             }
             else
             {
+                NRF_LOG_ERROR("Client has not enabled the GHS Control point");
                 reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR;
+            }
+        }
+        // Setting the time on the Simple Time characteristic
+        else if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.handle == m_clock_info_handle.value_handle)
+        {
+            unsigned char req_flags = (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[GHS_TIME_INDEX_FLAGS] & 0xDF);  // Need to ignore the on current timeline setting
+            unsigned char ghs_flags = (sTimeInfoData->timeInfoBuf[GHS_TIME_INDEX_FLAGS] & 0xDF);
+            unsigned char req_offset = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[GHS_TIME_INDEX_OFFSET];
+            unsigned char ghs_offset = sTimeInfoData->timeInfoBuf[GHS_TIME_INDEX_OFFSET];
+            if ((req_flags == ghs_flags) && ((ghs_offset == 0x80 && req_offset == 0x80) || (ghs_offset != 0x80 && req_offset != 0x80)))
+            {
+                unsigned char req_sync = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[GHS_TIME_INDEX_TIME_SYNC];
+                unsigned char ghs_sync = sTimeInfoData->timeInfoBuf[GHS_TIME_INDEX_TIME_SYNC];
+                if ((ghs_sync == INFRA_MDC_TIME_SYNC_NONE || ghs_sync == INFRA_MDC_TIME_SYNC_EBWW) ||   // If we are not synced or set by a user, accept all incomings
+                    (req_sync != INFRA_MDC_TIME_SYNC_EBWW && req_sync != INFRA_MDC_TIME_SYNC_OTHER))    // If we are something else and incoming is not UI or other, accept
+                {
+                    NRF_LOG_DEBUG("PHG setting the time on the Clock Info at time %u", getTicks());
+                    reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
+                    reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
+                    reply.params.write.update = 1;
+                    reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
+                    reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
+                    current_char_handle = m_clock_info_handle.value_handle;
+                    err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
+                    if (err_code != NRF_SUCCESS)
+                    {
+                        NRF_LOG_ERROR("RW SetTime char write reply gave error %u:", err_code);
+                    }
+                    handleSetTime(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data);
+                    return true;
+                }
+                else
+                {
+                    NRF_LOG_WARNING("Client set time has too poor of a synchronization. ghs sync: %u  req sync: %u  Not setting time.", ghs_sync, req_sync);
+                    reply.params.write.gatt_status = GHS_TIME_ERROR_TIME_SYNC_TOO_POOR;
+                }
+            }
+            else
+            {
+                NRF_LOG_ERROR("Client set time has incorrect flags or offset format. ghs flags: 0x%02X, request flags: 0x%02X  ghs offset: 0x%02X, request offset: 0x%02X",
+                             ghs_flags, req_flags, ghs_offset, req_offset);
+                reply.params.write.gatt_status = GHS_TIME_ERROR_INCORRECT_FORMAT;
             }
         }
         err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
@@ -847,10 +894,10 @@ static void print_data(unsigned char *data, unsigned short data_length)
                 chunk = data_length - j;
             }
             NRF_LOG_INFO("%s", (uint32_t)byteToHex(&data[j], buffer, " ", chunk));
+            NRF_LOG_FLUSH();
             j = j + chunk;
             if (j >= data_length) break;
         }
-        NRF_LOG_FLUSH();
     }
 }
 
@@ -875,7 +922,7 @@ static ret_code_t send_data()
     if (global_send.offset == 0 && send_flag)
     {
         recordNum = global_send.recordNumber;
-        frag_header = 0xFD; // first fragment - well after 4 gets added to it. Each count increments by 4
+        frag_header = ((frag_header & 0xFC) | 1); // 1111 1100 + 1
         NRF_LOG_INFO("=====> Sending %u bytes of data at time %u: ", global_send.data_length, getTicks());
         print_data(global_send.data, global_send.data_length);
     }
@@ -921,7 +968,7 @@ static ret_code_t send_data()
             // If the amount is less than that value set it to the amount left.
             else
             {
-                frag_header = (frag_header | 2);
+                frag_header = (frag_header | 2); // Add the 'last' fragment indicator
                 hvx_length = global_send.data_length - global_send.offset + data_reduction;
             }
             frag_header = frag_header + 4;        // Now increment the fragment counter bits 2-7. Bits 0 and one are set appropriately.
@@ -1196,15 +1243,8 @@ static void ghscp_handler(unsigned char *cmd, unsigned short len)
             {
                 printCommand(str, global_send.current_command);
 
-                if (cccdSet[LIVE_DATA_CCCD_INDEX] > 0)                // Has the live data characteristic been enabled?
-                {
-                    createCpResponse(GHSCP_RSP_SUCCESS, 1);       // Indicate a success response
-                    current_char_handle = m_ghs_bt_sig_live_data_not_handle.value_handle;  // NEEDED FOR THE SEND_DATA method!!
-                }
-                else
-                {
-                    createCpResponse(GHSCP_RSP_LIVE_CCCD_DISABLED, 1);       // Indicate live data characteristic not enabled response
-                }
+                createCpResponse(GHSCP_RSP_SUCCESS, 1);       // Indicate a success response
+
                 live_data_mode = (cmd[0] == GHSCP_SET_LIVE_DATA_MODE);       // Set/Clear our internal live data mode flag
                 NRF_LOG_INFO("Current enabled state of live data characteristic %u.  Live data mode is now %u", cccdSet[LIVE_DATA_CCCD_INDEX], live_data_mode);
             }
@@ -1344,7 +1384,7 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
         else
         {
             RESP_NO_RECORDS[2] = cmd[0];
-            createRacpResponse(RESP_REJECTED, 4);
+            createRacpResponse(RESP_SERVER_BUSY, 4);
             send_flag = true;
         }
         break;
@@ -1375,7 +1415,7 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
             {
                 printCommandErr(str, global_send.current_command, "rejected since busy");
                 RESP_NO_RECORDS[2] = cmd[0];
-                createRacpResponse(RESP_REJECTED, 4);
+                createRacpResponse(RESP_SERVER_BUSY, 4);
                 send_flag = true;
             }
         }
@@ -1398,26 +1438,31 @@ static void handleSetTime(unsigned char *setTime)
         unsigned short i;
         unsigned char oldTime[TIME_STAMP_LENGTH];
         unsigned char newTime[TIME_STAMP_LENGTH];
-        unsigned long long oldTimeVal = 0;
-        unsigned long long newTimeVal = 0;
-        long long diff = 0;
+        unsigned long long oldTimeVal = 0ULL;
+        unsigned long long newTimeVal = 0ULL;
+        long long diff = 0LL;
+        long long oldEpoch = epoch;
         unsigned short timeSync;
         char printBuf[64];
         getCurrentTime();
         memcpy(oldTime, &sTimeInfoData->timeInfoBuf[sTimeInfoData->currentTime_index], TIME_STAMP_LENGTH); // destination, source, length
         memcpy(newTime, setTime, TIME_STAMP_LENGTH);
+        // check that formats are good
         memset(printBuf, 0, 64);
         NRF_LOG_INFO("Set Time received: %s", (uint32_t)byteToHex(newTime, printBuf, " ", TIME_STAMP_LENGTH));
+        NRF_LOG_FLUSH();
         updateCurrentTimeFromSetTime(&sTimeInfoData, newTime);
+        NRF_LOG_INFO("New current time: %s", (uint32_t)byteToHex(sTimeInfoData->timeInfoBuf, printBuf, " ", TIME_STAMP_LENGTH));
+        NRF_LOG_FLUSH();
         for (i = 0; i < 6; i++)
         {
              oldTimeVal = (oldTimeVal << 8) + (((unsigned long long)oldTime[5 - i + GHS_TIME_INDEX_EPOCH]) & 0xFF);  // epoch is located after a 1-byte flag
              newTimeVal = (newTimeVal << 8) + (((unsigned long long)newTime[5 - i + GHS_TIME_INDEX_EPOCH]) & 0xFF);
         }
         diff = newTimeVal - oldTimeVal;
-    //     NRF_LOG_DEBUG("old time in seconds: %d  new time in seconds: %d diff in seconds", oldTimeVal/1000, newTimeVal/1000, diff/1000);
-        epoch = (diff < 0) ? (oldTimeVal - newTimeVal) + epoch : epoch + diff; // Adjust start epoch by difference too. This allows us to get new time by adding current ticks to new start epoch
+        epoch = epoch + diff; // Adjust start epoch by difference too. This allows us to get new time by adding current ticks to new start epoch
                                                              // How to add an unsigned int to a signed int
+        NRF_LOG_DEBUG("old time: %llx  new time: %llx diff %llx  old epoch: %llx, new epoch: %llx", oldTimeVal, newTimeVal, diff, oldEpoch, epoch);
     //     NRF_LOG_DEBUG("New base epoch: %d ", epoch/1000);
         timeSync = (((unsigned short) newTime[GHS_TIME_INDEX_TIME_SYNC]) & 0xFF);
         sGhsTime->timeSync = timeSync;      // Update the time sync of our 'base' current time
@@ -1567,6 +1612,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
             NRF_LOG_INFO("Connection event received at time %u.", getTicks());
             m_connection_handle = p_ble_evt->evt.gap_evt.conn_handle;
             global_send.chunk_size = (mtu_size - OPCODE_LENGTH - HANDLE_LENGTH);
+            frag_header = 0xFC;
             if (saveDataBuffer != NULL)
             {
                 // Calling sd_ble_gatts_sys_attr_set with CCCD info
@@ -1680,6 +1726,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                     memcpy(saveDataBuffer, currentSysDataBuffer, saveDataLength);
                 }
                 free(currentSysDataBuffer);
+            }
+            else
+            {
+                flash_write_needed = (numberOfStoredMsmtGroups != initialNumberOfStoredMsmtGroups);
             }
             m_connection_handle = BLE_CONN_HANDLE_INVALID;
             if (flash_write_needed)
@@ -1871,11 +1921,11 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 NRF_LOG_INFO("Enabling GHS Bt Sig live data CCCD with %d at time %u", write_data, getTicks());
             }
             // Setting the time on the Simple Time characteristic
-            else if(p_ble_evt->evt.gatts_evt.params.write.handle == m_clock_info_handle.value_handle)
-            {
-                NRF_LOG_DEBUG("PHG setting the time on the Clock Info at time %u", getTicks());
-                handleSetTime(p_ble_evt->evt.gatts_evt.params.write.data);
-            }
+          //  else if(p_ble_evt->evt.gatts_evt.params.write.handle == m_clock_info_handle.value_handle)
+          //  {
+          //      NRF_LOG_DEBUG("PHG setting the time on the Clock Info at time %u", getTicks());
+          //      handleSetTime(p_ble_evt->evt.gatts_evt.params.write.data);
+          //  }
             break;
 
         // Turns out for notifications one sends in a loop and you may get one event per N packets. Could be one event per notification
@@ -2401,14 +2451,14 @@ static void initializeBluetooth()
         err_code = createStandardCharacteristic(m_clock_info_service_handle,
             &m_clock_info_handle,
             BTLE_CLOCK_INFO_CHAR,
-            false,  // No CCCD
-            BLE_GATT_HVX_INVALID,  // ignored since CCCD is set to false
+            true,  //  CCCD
+            BLE_GATT_HVX_INDICATION,
             sTimeInfoData->dataLength,
             sTimeInfoData->timeInfoBuf,
-            TRAP_READ,   // We need to trap the read to set the time!
+            TRAP_BOTH,   // We need to trap the read to set the time!
             (ble_gap_conn_sec_mode_t)
             {
-                0, 0    // CCCD write is forbidden
+                1, 1    // CCCD read write is open
             },
             (ble_gap_conn_sec_mode_t)
             {

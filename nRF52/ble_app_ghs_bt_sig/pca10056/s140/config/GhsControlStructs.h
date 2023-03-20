@@ -103,7 +103,7 @@
 
 // For the s_TimeInfo struct
 
-#define TIME_FLAGS_SUPPORTS_SET_TIME 1      // PHD supports the set time operation
+#define TIME_FLAGS_WANT_SET_TIME 1      // PHD supports the set time operation
 
 // GHS Time flags for s_GhsTime struct
 #define GHS_TIME_FLAGS_RELATIVE_TIME 1      // PHD supports an 'arbitrary' or relative time. Just a tick counter where the epoch 0 value has no semantic meaning
@@ -118,6 +118,9 @@
 #define GHS_TIME_FLAG_SUPPORTS_TIMEZONE 0x10
 #define GHS_TIME_FLAG_ON_CURRENT_TIMELINE 0x20 // 0010 0000
 #define GHS_TIME_OFFSET_UNSUPPORTED 0x80
+
+#define GHS_TIME_ERROR_TIME_SYNC_TOO_POOR 0x80
+#define GHS_TIME_ERROR_INCORRECT_FORMAT 0x81
 
 // The factor values convert our 32768 ticks per second RTC to one of the supported resolutions
 //#define FACTOR 10000L   // For milliseconds/10
@@ -176,6 +179,8 @@ Unique Device Identifier (UDI) characteristic   0x7F3A (Temporary Assigned Numbe
 */
 
 #define TIME_STAMP_LENGTH 9
+#define GHS_TIME_INDEX_STATUS TIME_STAMP_LENGTH
+#define GHS_TIME_INDEX_CAPS (TIME_STAMP_LENGTH + 1)
 #define GHS_TIME_INDEX_FLAGS 0
 #define GHS_TIME_INDEX_EPOCH 1
 #define GHS_TIME_INDEX_TIME_SYNC 7
@@ -294,8 +299,8 @@ typedef struct
 
 typedef struct
 {
-    unsigned short timeFlagsSetTime;    // Whether the device supports the set time operation.
-    s_GhsTime *ghsTime;                 // Pointer to an s_GhsTime struct that needs to remain in scope
+    unsigned short timeFlagsWantSetTime;    // Whether the device wants the time set.
+    s_GhsTime *ghsTime;                     // Pointer to an s_GhsTime struct that needs to remain in scope
 } s_TimeInfo;
 
 typedef struct

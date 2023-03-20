@@ -6,17 +6,17 @@
 #include "GhsControlStructs.h"
 
 
-#define BP_CUFF 0
+#define BP_CUFF 1
 #define PULSE_OX 0
 #define GLUCOSE 0
 #define HEART_RATE 0    // At this time USES_TIMESTAMP in GhsControlStructs.h must be set to 0 or it wont work right
-#define SPIROMETER 1
+#define SPIROMETER 0
 #define SCALE 0
 #define THERMOMETER 0
 
 #define NUMBER_OF_STORED_MSMTS 30
 #define SUPPORT_PAIRING 1  // 1: requires pairing/bonding 0: no pairing or bonding
-#define USES_STORED_DATA 0
+#define USES_STORED_DATA 1
 #define USES_LIVE_DATA 1
 
 #define USE_DK 1        // Set NRF_LOG_ENABLED to 0 when DK is 0. The idea is either DK or nRF52840 dongle
