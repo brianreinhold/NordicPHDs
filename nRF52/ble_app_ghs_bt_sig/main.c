@@ -196,7 +196,7 @@ static uint16_t                 saveDataLength                  = 0;
 static uint8_t                  *saveDataBuffer                 = NULL;
 static volatile bool            restartAdv                      = false;
 static uint8_t                  frag_header                     = 0xFC;
-static unsigned char            charBuff[8];
+static unsigned char            charBuff[16];
 static unsigned char            racp_request;
 unsigned short                  num_records_to_send             = 0;
 
@@ -208,7 +208,7 @@ nrf_mutex_t q_mutex;
 __ALIGN(4) uint8_t *evt_buf;
 __ALIGN(4) uint8_t *evt_buf2;
 
-static uint8_t cpResponse[4];
+static uint8_t cpResponse[6];
 
 uint8_t tempBuf[512];  // For send_data
 
@@ -245,15 +245,12 @@ extern char *DEVICE_NAME;
 extern unsigned short SPECIALIZATION;
 extern unsigned short BLE_APPEARANCE;
 
-unsigned char GET_NUMBER_OF_RECORDS_RESP_SUCCESS[4]   = {0x05, 0x00, 0x00, 0x00};  // same for all, gte, first. last operators. Last two bytes number of records
+unsigned char GET_NUMBER_OF_RECORDS_RESP_SUCCESS[6]   = {0x05, 0x00, 0x00, 0x00, 0x00, 0x00};  // same for all, gte, first. last operators. Last two bytes number of records
 unsigned char GET_RECORDS_RESP_SUCCESS[4]             = {0x06, 0x00, 0x01, 0x01};  // same for all, gte, first. last operators
-unsigned char GET_COMBO_RECORDS_RESP_SUCCESS[4]       = {0x08, 0x00, 0x00, 0x00};  // Same set of responses for all combo cases. Last two bytes number of records sent
+unsigned char GET_COMBO_RECORDS_RESP_SUCCESS[6]       = {0x08, 0x00, 0x00, 0x00, 0x00, 0x00};  // Same set of responses for all combo cases. Last two bytes number of records sent
 unsigned char DELETE_RECORDS_RESP_SUCCESS[4]          = {0x06, 0x00, 0x02, 0x01};  // same for all, gte, first. last operators 
 
-unsigned char RESP_NO_RECORDS[4]                = {0x06, 0x00, 0x00, 0x06};  // need to fill [2] with the op-code (01 for get records, 07 for combo, 02 for delete)
-unsigned char RESP_OPCODE_UNSUPPORTED[4]        = {0x06, 0x00, 0x00, 0x02};  // need to fill [2] with the op-code
-unsigned char RESP_OPER_UNSUPPORTED[4]          = {0x06, 0x00, 0x00, 0x04};  // need to fill [2] with the op-code
-unsigned char RESP_SERVER_BUSY[4]                  = {0x06, 0x00, 0x00, 0x0A};  // need to fill [2] with the op-code
+unsigned char RESP_RACP_ERROR[6]                = {0x06, 0x00, 0x00, 0x06, 0x00, 0x00};  // need to fill [2] with the op-code (01 for get records, 07 for combo, 02 for delete)
 
 //unsigned char MSMT_RECORD_COMPLETED[2] = {0xFF, 0xFF};
 //unsigned char SENSOR_DONE[2]           = {0xFF, 0xFE};
@@ -262,7 +259,7 @@ unsigned char RESP_SERVER_BUSY[4]                  = {0x06, 0x00, 0x00, 0x0A};  
 unsigned char GHSCP_RSP_SUCCESS[1] =  {0x80};
 unsigned char GHSCP_RSP_BUSY[1] = {0x81};  // BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG
 unsigned char GHSCP_RSP_LIVE_CCCD_DISABLED[1] = {0x82}; // BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR
-unsigned char GHSCP_RSP_UNKNOWN_COMMAND[1] = {0x83};
+unsigned char GHSCP_RSP_UNKNOWN_COMMAND[1] = {0x81};
 
 // Time clock
 unsigned long prevCount = 0;
@@ -441,6 +438,7 @@ static uint32_t advertising_start()
 {
     ret_code_t             error_code;
     msmt_id = 1;
+    global_send.number_of_groups = 0;
 
     error_code = sd_ble_gap_adv_start(m_adv_handle, m_config_id);
 
@@ -715,24 +713,31 @@ static bool do_read_request(ble_evt_t * p_ble_evt)
         ret_code_t err_code;
         ble_gatts_rw_authorize_reply_params_t reply;
         memset(&reply, 0, sizeof(ble_gatts_rw_authorize_reply_params_t));
+        reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
         // Command from RACP control point
         if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.handle == m_racp_handle.value_handle)
         {
             if (cccdSet[RACP_CCCD_INDEX])
             {
-                reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
-                reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
-                reply.params.write.update = 1;
-                reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
-                reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
-                err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
-                if (err_code != NRF_SUCCESS)
+                if (global_send.number_of_groups == 0)
                 {
-                    NRF_LOG_ERROR("RW RACP reply gave error %u:", err_code);
+                    reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
+                    reply.params.write.update = 1;
+                    reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
+                    reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
+                    err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
+                    if (err_code != NRF_SUCCESS)
+                    {
+                        NRF_LOG_ERROR("RW RACP reply gave error %u:", err_code);
+                    }
+                    current_char_handle = m_racp_handle.value_handle;
+                    racp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
+                    return true;
                 }
-                current_char_handle = m_racp_handle.value_handle;
-                racp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
-                return true;
+                else
+                {
+                    reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG;
+                }
             }
             else
             {
@@ -743,25 +748,32 @@ static bool do_read_request(ble_evt_t * p_ble_evt)
         // Command from GHS Control Point
         else if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.handle == m_ghs_bt_sig_cp_handle.value_handle)
         {
-            if (racp_mode)
+            if (cccdSet[GHS_CP_CCCD_INDEX])
             {
-                reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG;
-            }
-            else if (cccdSet[GHS_CP_CCCD_INDEX])
-            {
-                reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
-                reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
-                reply.params.write.update = 1;
-                reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
-                reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
-                current_char_handle = m_ghs_bt_sig_live_data_not_handle.value_handle;  // NEEDED FOR THE SEND_DATA method!!
-                err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
-                if (err_code != NRF_SUCCESS)
+                if (racp_mode)
                 {
-                    NRF_LOG_ERROR("RW GHS CP reply gave error %u:", err_code);
+                    reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG;
                 }
-                ghscp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
-                return true;
+                else if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[0] < 1 ||
+                         p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[0] > 2)
+                {
+                    reply.params.write.gatt_status = 0x81;
+                }
+                else
+                {
+                    reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
+                    reply.params.write.update = 1;
+                    reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
+                    reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
+                    current_char_handle = m_ghs_bt_sig_live_data_not_handle.value_handle;  // NEEDED FOR THE SEND_DATA method!!
+                    err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
+                    if (err_code != NRF_SUCCESS)
+                    {
+                        NRF_LOG_ERROR("RW GHS CP reply gave error %u:", err_code);
+                    }
+                    ghscp_handler(p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data, p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len);
+                    return true;
+                }
             }
             else
             {
@@ -785,7 +797,6 @@ static bool do_read_request(ble_evt_t * p_ble_evt)
                 {
                     NRF_LOG_DEBUG("PHG setting the time on the Clock Info at time %u", getTicks());
                     reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
-                    reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
                     reply.params.write.update = 1;
                     reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
                     reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
@@ -930,7 +941,6 @@ static ret_code_t send_data()
 
     while(true)
     {
-        NRF_LOG_DEBUG("Start of send while loop");
         unsigned short data_reduction = 0; // Reduction of data size sent due to fragment and record number headers
         bool insert_recordNumber = false;
         if (global_send.handle == m_ghs_bt_sig_live_data_not_handle.value_handle || global_send.handle == m_ghs_bt_sig_stored_data_not_handle.value_handle)
@@ -972,7 +982,7 @@ static ret_code_t send_data()
                 hvx_length = global_send.data_length - global_send.offset + data_reduction;
             }
             frag_header = frag_header + 4;        // Now increment the fragment counter bits 2-7. Bits 0 and one are set appropriately.
-            NRF_LOG_DEBUG("=====> Send # %u: Send %u bytes of %u total from offset %u at time %u. Data reduction: %u",
+            NRF_LOG_DEBUG("=====> Fragment # %u: Send %u bytes of %u total from offset %u at time %u. Data reduction: %u",
                 count, hvx_length - data_reduction, global_send.data_length, global_send.offset, getTicks(), data_reduction);
             NRF_LOG_DEBUG("=====> Handle %u cp handle %u, stored handle %u, live handle %u", 
                 global_send.handle, m_racp_handle.value_handle, m_ghs_bt_sig_stored_data_not_handle.value_handle,
@@ -1024,7 +1034,7 @@ static ret_code_t send_data()
         hvx_params.p_data = tempBuf;
 
         // Send indication or notification
-        NRF_LOG_DEBUG("=====> Sending %u bytes", hvx_length);
+        NRF_LOG_DEBUG("=====> Sending fragment of %u bytes", hvx_length);
         print_data(tempBuf, hvx_length);
         error_code = sd_ble_gatts_hvx(m_connection_handle, &hvx_params);
         if (error_code == NRF_SUCCESS)
@@ -1180,7 +1190,7 @@ static bool encodeMsmtData(void *data)
  * That's a minor problem. This is called repeatedly but only generates measurements after the 
  * PHG has enabled the live data characteristic.
  */
- #if (USES_LIVE_DATA == 1)
+#if (USES_LIVE_DATA == 1 || USES_STORED_DATA == 2)
 static void live_data_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
@@ -1241,10 +1251,10 @@ static void ghscp_handler(unsigned char *cmd, unsigned short len)
 
             if (!racp_mode)                 // If we are NOT doing an RACP procedure
             {
+                unsigned short i;
                 printCommand(str, global_send.current_command);
 
                 createCpResponse(GHSCP_RSP_SUCCESS, 1);       // Indicate a success response
-
                 live_data_mode = (cmd[0] == GHSCP_SET_LIVE_DATA_MODE);       // Set/Clear our internal live data mode flag
                 NRF_LOG_INFO("Current enabled state of live data characteristic %u.  Live data mode is now %u", cccdSet[LIVE_DATA_CCCD_INDEX], live_data_mode);
             }
@@ -1269,19 +1279,28 @@ static void ghscp_handler(unsigned char *cmd, unsigned short len)
 
 static void racp_handler(unsigned char *cmd, unsigned short len)
 {
-    //global_send.chunk_size = (data_length - 4 - OPCODE_LENGTH - HANDLE_LENGTH); // revert back to data_length. This can be set longer in cases where mtu_size can't
-    //                                                                            // the data length update is done in event BLE_GAP_EVT_DATA_LENGTH_UPDATE
     global_send.current_command = cmd[0] + (cmd[1] << 8);  // We made need to include cmd[2]
     char *str = NULL;
     switch (cmd[0])
     {
         case RACP_GET_NUM_OF_RECORDS:       // Get number of records command
-            #if (USES_STORED_DATA == 0)
-                RESP_OPER_UNSUPPORTED[2] = cmd[0];
-                createRacpResponse(RESP_OPER_UNSUPPORTED, 4);
+            #if (USES_STORED_DATA != 1)
+                RESP_RACP_ERROR[2] = cmd[0];
+                RESP_RACP_ERROR[3] = RACP_OPERATOR_NOT_SUPPORTED;
+                createRacpResponse(RESP_RACP_ERROR, 4);
                 send_flag = true;
                 return;
             #else
+            // Invalid requests 0, >= 7
+            if (cmd[1] == 0)// ||  // RFU
+                //cmd[1] >= 7)    // RFU
+            {
+                RESP_RACP_ERROR[2] = cmd[0];
+                RESP_RACP_ERROR[3] = RACP_INVALID_OPERATOR;
+                createRacpResponse(RESP_RACP_ERROR, 4);
+                send_flag = true;
+                break;
+            }
             switch (cmd[1])
             {
                 case RACP_ALL:
@@ -1289,10 +1308,11 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
                     str = "get Number of all Records";
                     printCommand(str, global_send.current_command);
                     NRF_LOG_INFO("Number of all records is %u", numberOfStoredMsmtGroups);
-
                     GET_NUMBER_OF_RECORDS_RESP_SUCCESS[2] = (numberOfStoredMsmtGroups & 0xFF);
                     GET_NUMBER_OF_RECORDS_RESP_SUCCESS[3] = ((numberOfStoredMsmtGroups >> 8) & 0xFF);
-                    createRacpResponse(GET_NUMBER_OF_RECORDS_RESP_SUCCESS, 4);
+                    GET_NUMBER_OF_RECORDS_RESP_SUCCESS[4] = 0;
+                    GET_NUMBER_OF_RECORDS_RESP_SUCCESS[5] = 0;
+                    createRacpResponse(GET_NUMBER_OF_RECORDS_RESP_SUCCESS, 6);
 
                     send_flag = true;
                 }
@@ -1301,19 +1321,42 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
                 case RACP_GTE:
                 {
                     unsigned short numberOfRecords = getNumberOfStoredRecords(cmd, len);
-                    str = (cmd[2] == RACP_RECORD_NUM) ? "get Number of Records >= record number" :
-                                                            "get Number of Records >= timestamp";
+                    if (cmd[2] == RACP_RECORD_NUM)
+                    {
+                        str = "get Number of Records >= record number";
+                    }
+                    else if (cmd[2] == RACP_TIMESTAMP)
+                    {
+                        str = "get Number of Records >= timestamp";
+                    }
+                    else // unsupported operand
+                    {
+                        RESP_RACP_ERROR[2] = cmd[0];
+                        RESP_RACP_ERROR[3] = RACP_OPERAND_NOT_SUPPORTED;
+                        createRacpResponse(RESP_RACP_ERROR, 4);
+                        send_flag = true;
+                        break;
+                    }
                     global_send.current_command = global_send.current_command + (cmd[2] << 16);
                     printCommand(str, global_send.current_command);
                     
                     NRF_LOG_INFO("Number of records is %u", numberOfRecords);
-
                     GET_NUMBER_OF_RECORDS_RESP_SUCCESS[2] = (numberOfRecords & 0xFF);
                     GET_NUMBER_OF_RECORDS_RESP_SUCCESS[3] = ((numberOfRecords >> 8) & 0xFF);
-                    createRacpResponse(GET_NUMBER_OF_RECORDS_RESP_SUCCESS, 4);
+                    GET_NUMBER_OF_RECORDS_RESP_SUCCESS[4] = 0;
+                    GET_NUMBER_OF_RECORDS_RESP_SUCCESS[5] = 0;
+                    createRacpResponse(GET_NUMBER_OF_RECORDS_RESP_SUCCESS, 6);
                     send_flag = true;
                 }
                 break;
+
+                default:
+                    RESP_RACP_ERROR[2] = cmd[0];
+                    RESP_RACP_ERROR[3] = RACP_OPERATOR_NOT_SUPPORTED;
+                    createRacpResponse(RESP_RACP_ERROR, 4);
+                    send_flag = true;
+                    break;
+
             }
             break;
             #endif
@@ -1321,19 +1364,30 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
     case RACP_GET_RECORDS:
     case RACP_GET_COMBINED:
     {
-        NRF_LOG_DEBUG("----> Get records request received");
-        #if (USES_STORED_DATA == 0)
-            RESP_OPER_UNSUPPORTED[2] = cmd[0];
-            createRacpResponse(RESP_OPER_UNSUPPORTED, 4);
+        NRF_LOG_DEBUG("----> Get records request received %u for data %u", cmd[0], cmd[0], cmd[1]);
+        #if (USES_STORED_DATA != 1)
+            RESP_RACP_ERROR[2] = cmd[0];
+            RESP_RACP_ERROR[3] = RACP_OPERAND_NOT_SUPPORTED;
+            createRacpResponse(RESP_RACP_ERROR, 4);
             send_flag = true;
             return;
         #else
         if (!live_data_mode && cccdSet[STORED_DATA_CCCD_INDEX])  // If not in live data mode and stored data char enabled
         {
+            // Invalid requests 0, >= 7
+            if (cmd[1] == 0)// ||  // RFU
+               // cmd[1] >= 7)    // RFU
+            {
+                RESP_RACP_ERROR[2] = cmd[0];
+                RESP_RACP_ERROR[3] = RACP_INVALID_OPERATOR;
+                createRacpResponse(RESP_RACP_ERROR, 4);
+                send_flag = true;
+                break;
+            }
             bool combined = (cmd[0] == RACP_GET_COMBINED);
             num_records_to_send = getNumberOfStoredRecords(cmd, len);
             long start_index = getStartIndexInStoredRecords(cmd, len);
-            NRF_LOG_DEBUG("----> Number of records to send %u Start index %u", num_records_to_send, start_index);
+            NRF_LOG_DEBUG("----> Number of records to send %u Start index %i", num_records_to_send, start_index);
             switch(cmd[1])
             {
                 case RACP_ALL:
@@ -1347,44 +1401,54 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
                     {
                         if (cmd[2] == RACP_RECORD_NUM)
                         {
-                            str = (str != NULL) ? str : "get records GTE to record num";
+                            str = "get records GTE to record num";
                         }
                         else if (cmd[2] == RACP_TIMESTAMP)
                         {
-                            str = (str != NULL) ? str : "get records GTE to time stamp";
+                            str = "get records GTE to time stamp";
+                        }
+                        else // unsupported operand
+                        {
+                            RESP_RACP_ERROR[2] = cmd[0];
+                            RESP_RACP_ERROR[3] = RACP_OPERAND_NOT_SUPPORTED;
+                            createRacpResponse(RESP_RACP_ERROR, 4);
+                            send_flag = true;
+                            break;
                         }
                         global_send.current_command = global_send.current_command + (cmd[2] << 16);
                     }
-                    str = (str != NULL) ? str : "get records GTE to timestamp";
                     racp_request = cmd[0];
                     stored_data_done_sent = false;
                     printCommand(str, global_send.current_command);
                     if (start_index >= 0)
                     {
                         racp_mode = true;
-                        NRF_LOG_DEBUG("----> Sending stored data element %u", start_index);
+                        NRF_LOG_DEBUG("----> Sending stored data element %i", start_index);
                         global_send.number_of_groups = num_records_to_send;
                         current_char_handle = m_ghs_bt_sig_stored_data_not_handle.value_handle;   // NEEDED FOR THE SEND_DATA method!!
                         sendStoredMeasurements(start_index);
                     }
                     else if (num_records_to_send == 0)
                     {
-                        RESP_NO_RECORDS[2] = cmd[1];
-                        createRacpResponse(RESP_NO_RECORDS, 4);
+                        RESP_RACP_ERROR[2] = cmd[0];
+                        RESP_RACP_ERROR[3] = RACP_NO_RECORDS_FOUND;
+                        createRacpResponse(RESP_RACP_ERROR, 4);
                         send_flag = true;
                     }
                     break;
                 default:
-                    RESP_OPER_UNSUPPORTED[2] = cmd[0];
-                    createRacpResponse(RESP_OPER_UNSUPPORTED, 4);
+                    RESP_RACP_ERROR[2] = cmd[0];
+                    RESP_RACP_ERROR[3] = RACP_OPERATOR_NOT_SUPPORTED;
+                    createRacpResponse(RESP_RACP_ERROR, 4);
                     send_flag = true;
                     break;
             }
         }
         else
         {
-            RESP_NO_RECORDS[2] = cmd[0];
-            createRacpResponse(RESP_SERVER_BUSY, 4);
+            RESP_RACP_ERROR[2] = cmd[0];
+            RESP_RACP_ERROR[3] = RACP_SERVER_BUSY;
+            createRacpResponse(RESP_RACP_ERROR, 4);
             send_flag = true;
         }
         break;
@@ -1392,14 +1456,25 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
     }
 
     case RACP_DELETE_RECORDS:
-        #if (USES_STORED_DATA == 0)
-            RESP_OPER_UNSUPPORTED[2] = cmd[0];
-            createRacpResponse(RESP_OPER_UNSUPPORTED, 4);
+        #if (USES_STORED_DATA != 1)
+            RESP_RACP_ERROR[2] = cmd[0];
+            RESP_RACP_ERROR[3] = RACP_OPCODE_NOT_SUPPORTED;
+            createRacpResponse(RESP_RACP_ERROR, 4);
             send_flag = true;
             return;
         #else
         if (cccdSet[RACP_CCCD_INDEX])
         {
+            // Invalid requests 0, >= 7
+            if (cmd[1] == 0)// ||  // RFU
+               // cmd[1] >= 7)    // RFU
+            {
+                RESP_RACP_ERROR[2] = cmd[0];
+                RESP_RACP_ERROR[3] = RACP_INVALID_OPERATOR;
+                createRacpResponse(RESP_RACP_ERROR, 4);
+                send_flag = true;
+                break;
+            }
             str = "Delete All Stored Records";
             if (!live_data_mode)
             {
@@ -1410,12 +1485,14 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
                 printCommand(str, global_send.current_command);
                 createRacpResponse(DELETE_RECORDS_RESP_SUCCESS, 4);
                 send_flag = true;
+                stored_msmts_same = false;
             }
             else
             {
                 printCommandErr(str, global_send.current_command, "rejected since busy");
-                RESP_NO_RECORDS[2] = cmd[0];
-                createRacpResponse(RESP_SERVER_BUSY, 4);
+                RESP_RACP_ERROR[2] = cmd[0];
+                RESP_RACP_ERROR[3] = RACP_SERVER_BUSY;
+                createRacpResponse(RESP_RACP_ERROR, 4);
                 send_flag = true;
             }
         }
@@ -1425,9 +1502,10 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
     default:
         str = "an unsupported";
         printCommandErr(str, global_send.current_command, "is unsupported");
-        // Respond with command done
-        RESP_OPCODE_UNSUPPORTED[2] = cmd[0];
-        createRacpResponse(RESP_OPCODE_UNSUPPORTED, 4);
+        // Respond with opcode unsupported
+        RESP_RACP_ERROR[2] = cmd[0];
+        RESP_RACP_ERROR[3] = RACP_OPCODE_NOT_SUPPORTED;
+        createRacpResponse(RESP_RACP_ERROR, 4);
         send_flag = true;
     }
 }
@@ -1578,20 +1656,38 @@ static void handle_data_characteristics()
         else if (!stored_data_done_sent)
         {
             NRF_LOG_INFO("----> All stored data sent");
-            if (racp_request == RACP_GET_RECORDS)
+            if (racp_request == RACP_GET_RECORDS) // Old RACP
             {
                 createRacpResponse(GET_RECORDS_RESP_SUCCESS, 4);
             }
-            else
+            else // New RACP with number of records sent
             {
                 GET_COMBO_RECORDS_RESP_SUCCESS[2] = (num_records_to_send & 0xFF);
                 GET_COMBO_RECORDS_RESP_SUCCESS[3] = ((num_records_to_send >> 8)& 0xFF);
-                createRacpResponse(GET_COMBO_RECORDS_RESP_SUCCESS, 4);
+                GET_COMBO_RECORDS_RESP_SUCCESS[4] = 0;
+                GET_COMBO_RECORDS_RESP_SUCCESS[5] = 0;
+                createRacpResponse(GET_COMBO_RECORDS_RESP_SUCCESS, 6);
             }
+            global_send.number_of_groups = 0;
             stored_data_done_sent = true;
             send_flag = true;
         }
     }
+    #elif (USES_STORED_DATA == 2)
+        if ((global_send.current_command & 0xFF) == GHSCP_SET_LIVE_DATA_MODE)
+        {
+            global_send.number_of_groups--;
+            if (global_send.number_of_groups > 0 && global_send.number_of_groups <= NUMBER_OF_STORED_MSMTS)
+            {
+                NRF_LOG_DEBUG("----> Sending temp stored data element %u", (numberOfStoredMsmtGroups - global_send.number_of_groups));
+                sendStoredMeasurements(numberOfStoredMsmtGroups - global_send.number_of_groups);
+            }
+            else if (!stored_data_done_sent)
+            {
+                NRF_LOG_INFO("----> All temp stored data sent");
+                stored_data_done_sent = true;
+            }
+        }
     #endif
 }
 
@@ -1709,7 +1805,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 bool isEqual = ((currentSysDataLength == saveDataLength)
                                 && (saveDataLength > 0 && saveDataBuffer != NULL)
                                 && (memcmp(saveDataBuffer, currentSysDataBuffer, saveDataLength) == 0)
-                                && (numberOfStoredMsmtGroups == initialNumberOfStoredMsmtGroups));
+                                && stored_msmts_same);
                 if (isEqual)
                 {
                     NRF_LOG_INFO("Flash write not needed; data is equal to what is already in flash");
@@ -1729,14 +1825,14 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
             }
             else
             {
-                flash_write_needed = (numberOfStoredMsmtGroups != initialNumberOfStoredMsmtGroups);
+                flash_write_needed = !stored_msmts_same;
             }
             m_connection_handle = BLE_CONN_HANDLE_INVALID;
             if (flash_write_needed)
             {
                 latestTimeStamp = getRtcTicks();
                 saveKeysToFlash(&keys, &saveDataBuffer, &saveDataLength, cccdSet, &noOfCccds);
-                initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+                stored_msmts_same = true;
                 break;
             }
             reset_specializations();
@@ -2125,7 +2221,7 @@ static void receive_new_measurement(uint8_t * p_data)
 
             case BSP_EVENT_KEY_3:
             {
-                #if (USES_STORED_DATA == 1 && USES_TIMESTAMP == 1)
+                #if (USES_STORED_DATA >= 1 && USES_TIMESTAMP == 1)
                     if ( numberOfStoredMsmtGroups >= NUMBER_OF_STORED_MSMTS)
                     {
                         NRF_LOG_DEBUG("Stored data buffer full, skipping");
@@ -2135,20 +2231,27 @@ static void receive_new_measurement(uint8_t * p_data)
                     if (generateAndAddStoredMsmt(getRtcTicks(), getTicks(), numberOfStoredMsmtGroups))
                     {
                         numberOfStoredMsmtGroups++;
+                        stored_msmts_same = false;
                     }
                 #endif
             }
             break;
 
             case BSP_EVENT_KEY_1:
-                NRF_LOG_DEBUG("Sending disconnect");
-                ghs_abort = false;
-                app_timer_start(m_ghs_disconnect_timer_id, GHS_COMMAND_DELAY, NULL);
-              //  start_shutdown = true;
-              //  done_timer = getTicks();
-             //   app_timer_stop(m_ghs_live_data_timer_id);
-             //   createRacpResponse(SENSOR_DONE, 2);
-                //send_flag = true;
+                if (m_connection_handle != BLE_CONN_HANDLE_INVALID)
+                {
+                    NRF_LOG_INFO("Sending disconnect");
+                    ghs_abort = false;
+                    app_timer_start(m_ghs_disconnect_timer_id, GHS_COMMAND_DELAY, NULL);
+                }
+                else
+                {
+                    NRF_LOG_INFO("Clearing pairing and stored data");
+                    numberOfStoredMsmtGroups = 0;
+                    deleteStoredSpecializationMsmts();
+                    clearSecurityKeys(&keys);
+                }
+
                 break;
 
             case BSP_EVENT_KEY_2:
@@ -2229,7 +2332,7 @@ static void initializeBluetooth()
 
     memset(cccds, 0, noOfCccds);
     loadKeysFromFlash(&keys, &saveDataBuffer, &saveDataLength, cccds, &noOfCccds);
-    initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+    stored_msmts_same = true;
     NRF_LOG_DEBUG("Number of saved stored measurements in flash %u", numberOfStoredMsmtGroups);
     memcpy(cccdSet, cccds, noOfCccds);  // destination, source, length
     
@@ -2271,7 +2374,7 @@ static void initializeBluetooth()
     
     
     // ===================================== Create the GHS service
-    memset(charBuff, 0 ,8);
+    memset(charBuff, 0, 16);
     err_code = createPrimaryService(&m_ghs_bt_sig_service_handle, BTLE_GHS_BT_SIG_SERVICE);
     if (err_code != NRF_SUCCESS)
     {
@@ -2279,7 +2382,7 @@ static void initializeBluetooth()
         APP_ERROR_CHECK(err_code);
     }
     
-    #if (USES_LIVE_DATA == 1)
+    #if (USES_LIVE_DATA == 1 || USES_STORED_DATA == 2)
     // Create the GHS control point characteristic
     err_code = createStandardCharacteristic(m_ghs_bt_sig_service_handle,
         &m_ghs_bt_sig_cp_handle,
@@ -2335,7 +2438,7 @@ static void initializeBluetooth()
         BTLE_RACP_CHAR,
         true,   // Has CCCD
         BLE_GATT_HVX_INDICATION,   // This will cause indicate if CCCD is set to true
-        8,
+        16,
         charBuff,   // dummy buffer
         TRAP_WRITE,       // trap read/write with authorize to return a status error
         (ble_gap_conn_sec_mode_t) {1, (SUPPORT_PAIRING + 1)},   // [CCCD write is secured]

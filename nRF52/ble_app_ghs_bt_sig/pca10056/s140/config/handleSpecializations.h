@@ -16,7 +16,9 @@
 
 #define NUMBER_OF_STORED_MSMTS 30
 #define SUPPORT_PAIRING 1  // 1: requires pairing/bonding 0: no pairing or bonding
-#define USES_STORED_DATA 1
+#define USES_STORED_DATA 1 // 0 = no stored data of any type
+                           // 1 = treat as persistently stored data (RACP)
+                           // 2 = TODO: use as temporarily stored data
 #define USES_LIVE_DATA 1
 
 #define USE_DK 1        // Set NRF_LOG_ENABLED to 0 when DK is 0. The idea is either DK or nRF52840 dongle
@@ -27,7 +29,7 @@ extern s_TimeInfo *sTimeInfo;
 extern s_TimeInfoData *sTimeInfoData;
 extern s_SystemInfoData *systemInfoData;
 extern unsigned short numberOfStoredMsmtGroups;
-extern unsigned short initialNumberOfStoredMsmtGroups;
+extern bool stored_msmts_same;
 extern unsigned long long latestTimeStamp;
 extern unsigned long long epoch;
 extern unsigned long long factor;

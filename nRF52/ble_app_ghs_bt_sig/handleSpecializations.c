@@ -55,12 +55,12 @@ s_SystemInfo *systemInfo                        = NULL;     // We need to keep t
 unsigned short pairing                          = SUPPORT_PAIRING;        // Value of 1 indicates that pairing/bonding is required.
 unsigned char batteryCharValue                  = 0x63;
 unsigned short numberOfStoredMsmtGroups         = 0;
-unsigned short initialNumberOfStoredMsmtGroups  = 0;
+bool stored_msmts_same                          = true;
 unsigned long long latestTimeStamp              = 0;
 unsigned long msmt_id                           = 1;
 unsigned long recordNumber                      = 0;
 
-#if (USES_STORED_DATA == 1)
+#if (USES_STORED_DATA >= 1)
     s_MsmtData storedMsmts[NUMBER_OF_STORED_MSMTS];     // Maximum number of stored msmts NUMBER_OF_STORED_MSMTS you want to support.
                                                         // The s_MsmtData struct contains all the information that we will get from
                                                         // the sensor. It is specified in the handleSpecializations.h file and is
@@ -1538,7 +1538,7 @@ bool encodeSpecializationMsmts(s_MsmtData *msmt)
  * The fake data are generated from the current time stamp. This method would be replaced with
  * data coming from the sensor MCU interrupt while not connected.
  */
-#if (USES_STORED_DATA == 1)
+#if (USES_STORED_DATA >= 1)
 bool generateAndAddStoredMsmt(unsigned long long timeStampMsmt, unsigned long timeStamp, unsigned short numberOfStoredMsmtGroups)
 {
     #if (BP_CUFF == 1)
@@ -1894,11 +1894,13 @@ void deleteStoredSpecializationMsmts(void)
  * This method exists as we have no sensor to feed us real data. This method would be replaced by sensor
  * data coming from an MCU via an interrupt or event while connected.
  */
- #if (USES_LIVE_DATA == 1)
+ #if (USES_LIVE_DATA == 1 || USES_STORED_DATA == 2)
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp)
 {
     #if (BP_CUFF == 1)
         #define LIVE_COUNT_MAX 64
+        #if (USES_STORED_DATA == 2)
+        #endif
         if ((live_data_count & 0x07) == 0x00)
         {
             s_MsmtData bpMsmt;
@@ -2079,7 +2081,7 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
     // we adjust the time stamps of all our stored data to the new timeline. THat will
     // involve updating the epoch field of the stored time stamp by the difference and
     // and changing the time sync to that specified in the set time.
-    #if (USES_STORED_DATA == 1)
+    #if (USES_STORED_DATA >= 1)
         NRF_LOG_INFO("Doing date time adjustment of %lld on stored data", diff);
         for (i = 0; i < numberOfStoredMsmtGroups; i++)
         {
@@ -2089,7 +2091,7 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
                  storedMsmts[i].common.sGhsTime.epoch = (diff < 0) ? storedMsmts[i].common.sGhsTime.epoch - udiff
                             : storedMsmts[i].common.sGhsTime.epoch + diff;
                  storedMsmts[i].common.sGhsTime.timeSync = timeSync;
-                 initialNumberOfStoredMsmtGroups = 0; // This will assure flash gets written
+                 stored_msmts_same = false; // This will assure flash gets written
                  NRF_LOG_DEBUG("Updated time on msmt %u ", i);
              }
         }
@@ -2099,10 +2101,11 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
 void setNotOnCurrentTimeline(unsigned long long newCount)
 {
     int i;
-    #if (USES_STORED_DATA == 1)
+    #if (USES_STORED_DATA >= 1)
         for (i = 0; i < numberOfStoredMsmtGroups; i ++)
         {
             storedMsmts[i].common.sGhsTime.flagKnownTimeline = 0;
+            stored_msmts_same = false;
         }
     #endif
 }
