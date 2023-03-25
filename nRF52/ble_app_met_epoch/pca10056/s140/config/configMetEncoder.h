@@ -506,9 +506,9 @@ bool setHeaderDuration(s_MsmtGroup **msmtGroup);
 short addMetMsmtToGroup(s_MetMsmt *metMsmt, s_MsmtGroup **msmtGroupPtr);
 
 bool updateTimeStampEpoch(s_MsmtGroupData **msmtGroupDataPtr, unsigned long long epoch);
+bool updateTimeStampTimeline(s_MsmtGroupData **msmtGroupDataPtr, unsigned char unknownTimelineFlag);
 bool updateTimeStampTimeSync(s_MsmtGroupData **msmtGroupDataPtr, unsigned short timeSync);
 bool updateTimeStampOffset(s_MsmtGroupData **msmtGroupDataPtr, short offsetShift);
-bool updateTimeStampFlags(s_MsmtGroupData **msmtGroupDataPtr, unsigned short newflags);
 
 bool updateDataHeaderSupplementalTypes(s_MsmtGroupData** msmtGroupDataPtr, unsigned long suppType, unsigned suppType_index);
 bool updateDataMetMsmtSupplementalTypes(s_MsmtGroupData** msmtGroupDataPtr, short msmtIndex, unsigned long suppType, unsigned suppType_index);

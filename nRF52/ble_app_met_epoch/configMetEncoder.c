@@ -333,12 +333,6 @@ static bool checkMsmtGroupData(s_MsmtGroupData* msmtGroupData)
         s_TimeInfoData* timeInfoData = *timeInfoDataPtr;
         int index = timeInfoData->currentTime_index;
         sixByteEncode(timeInfoData->timeInfoBuf, index + MET_TIME_INDEX_EPOCH, epoch);
-  //      int i;
-  //      for (i = 0; i < 6; i++)
-  //      {
-  //          timeInfoData->timeInfoBuf[index + MET_TIME_INDEX_EPOCH + i] = (epoch & 0xFF);
-  //          epoch = (epoch >> 8);
-  //      }
         *timeInfoDataPtr = timeInfoData;
         return true;
     }
@@ -952,6 +946,10 @@ bool addHeaderAva(s_MsmtGroup **msmtGroupPtr, s_Avas *avaIn)
 }
 #endif
 
+// command | flags | Length |            Time-stamp            | Supp-types | refs | duration | Person-id | AVAs | Group-id | Number-of-msmts |
+//                          [epoch | flags | offset | Time-sync]
+#define FLAGS_INDEX 2       // index in data array of the header flags
+#define TIME_STAMP_INDEX 6  // index in data array of the time stamp if time stamp is present
 bool updateTimeStampEpoch(s_MsmtGroupData **msmtGroupDataPtr, unsigned long long epoch)
 {
     if (msmtGroupDataPtr == NULL || *msmtGroupDataPtr == NULL)
@@ -960,16 +958,36 @@ bool updateTimeStampEpoch(s_MsmtGroupData **msmtGroupDataPtr, unsigned long long
         return false;
     }
     s_MsmtGroupData* msmtGroupData = *msmtGroupDataPtr;
-    unsigned short flags =  msmtGroupData->data[2] & 0xFF + ((msmtGroupData->data[3] << 8) & 0xFF00);
+    unsigned short flags =  msmtGroupData->data[FLAGS_INDEX] & 0xFF + ((msmtGroupData->data[FLAGS_INDEX + 1] << 8) & 0xFF00);
     if ((flags & HEADER_FLAGS_TIMESTAMP) == HEADER_FLAGS_TIMESTAMP)
     {
-        sixByteEncode(msmtGroupData->data, MET_TIME_INDEX_EPOCH + 6, epoch);
-      //  unsigned short i;
-      //  for (i = 0; i < 6; i++)
-      //  {
-      //      msmtGroupData->data[i + MET_TIME_INDEX_EPOCH + 6] = (epoch & 0xFF);
-      //      epoch = (epoch >> 8);
-      //  }
+        sixByteEncode(msmtGroupData->data, MET_TIME_INDEX_EPOCH + TIME_STAMP_INDEX, epoch);
+    }
+    else
+    {
+        NRF_LOG_DEBUG("Time stamps not supported or time stamp was NULL.");
+        return false;
+    }
+    *msmtGroupDataPtr = msmtGroupData;
+    return true;
+}
+
+bool updateTimeStampTimeline(s_MsmtGroupData **msmtGroupDataPtr, unsigned char unknownTimelineFlag)
+{
+    NRF_LOG_DEBUG("Update time stamp on current timeline setting 0x%02X", unknownTimelineFlag);
+    if (msmtGroupDataPtr == NULL || *msmtGroupDataPtr == NULL)
+    {
+        NRF_LOG_DEBUG("Input parameters were NULL.");
+        return false;
+    }
+    s_MsmtGroupData* msmtGroupData = *msmtGroupDataPtr;
+    unsigned short flags =  msmtGroupData->data[FLAGS_INDEX] & 0xFF + ((msmtGroupData->data[FLAGS_INDEX + 1] << 8) & 0xFF00);
+    if ((flags & HEADER_FLAGS_TIMESTAMP) == HEADER_FLAGS_TIMESTAMP)
+    {
+        msmtGroupData->data[TIME_STAMP_INDEX + MET_TIME_INDEX_FLAGS] = 
+                (unknownTimelineFlag == MET_TIME_FLAG_UNKNOWN_TIMELINE) ?
+                   (msmtGroupData->data[TIME_STAMP_INDEX + MET_TIME_INDEX_FLAGS] | unknownTimelineFlag) :
+                   (msmtGroupData->data[TIME_STAMP_INDEX + MET_TIME_INDEX_FLAGS] & 0xBF);
     }
     else
     {
@@ -1000,28 +1018,6 @@ bool updateTimeStampTimeSync(s_MsmtGroupData **msmtGroupDataPtr, unsigned short 
     }
     return true;
 }
-
-bool updateTimeStampFlags(s_MsmtGroupData **msmtGroupDataPtr, unsigned short newflags)
-{
-    if (msmtGroupDataPtr == NULL || *msmtGroupDataPtr == NULL)
-    {
-        NRF_LOG_DEBUG("Input parameters were NULL.");
-        return false;
-    }
-    s_MsmtGroupData* msmtGroupData = *msmtGroupDataPtr;
-    unsigned short flags =  msmtGroupData->data[2] & 0xFF + ((msmtGroupData->data[3] << 8) & 0xFF00);
-    if ((flags & HEADER_FLAGS_TIMESTAMP) == HEADER_FLAGS_TIMESTAMP)
-    {
-        msmtGroupData->data[MET_TIME_INDEX_FLAGS + 6] = newflags;
-    }
-    else
-    {
-        NRF_LOG_DEBUG("Time stamps not supported or time stamp was NULL.");
-        return false;
-    }
-    return true;
-}
-
 
 bool updateTimeStampOffset(s_MsmtGroupData **msmtGroupDataPtr, short offsetShift)
 {

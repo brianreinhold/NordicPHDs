@@ -2248,7 +2248,9 @@ static void receive_new_measurement(uint8_t * p_data)
                 {
                     NRF_LOG_INFO("Clearing pairing and stored data");
                     numberOfStoredMsmtGroups = 0;
-                    deleteStoredSpecializationMsmts();
+                    #if(USES_STORED_DATA == 1)
+                        deleteStoredSpecializationMsmts();
+                    #endif
                     clearSecurityKeys(&keys);
                 }
 
@@ -2341,7 +2343,7 @@ static void initializeBluetooth()
         NRF_LOG_DEBUG("Factory timer reset: Current tick %u  Saved time of flash write %u", getRtcTicks(), latestTimeStamp);
         if (getRtcTicks() < latestTimeStamp)  // Time fault - inspect stored data and set flag on different time line
         {
-            setNotOnCurrentTimeline(getRtcCount());
+            setNotOnCurrentTimeline();
         }
     }
 

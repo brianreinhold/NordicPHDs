@@ -118,6 +118,7 @@ void loadKeysFromFlash(ble_gap_sec_keyset_t* keys,
     unsigned short *noOfCccds);
 
 void allocateMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys);
+void clearSecurityKeys(ble_gap_sec_keyset_t* keys);
 void freeMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys);
 #endif
 

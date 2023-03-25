@@ -27,7 +27,7 @@ extern s_TimeInfo *sTimeInfo;
 extern s_TimeInfoData *sTimeInfoData;
 extern s_SystemInfoData *systemInfoData;
 extern unsigned short numberOfStoredMsmtGroups;
-extern unsigned short initialNumberOfStoredMsmtGroups;
+extern bool stored_msmts_same;
 extern unsigned long long latestTimeStamp;
 extern unsigned long long epoch;
 extern unsigned long long factor;

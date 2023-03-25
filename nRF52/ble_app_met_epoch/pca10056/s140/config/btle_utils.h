@@ -83,7 +83,7 @@ ret_code_t createStandardCharacteristic(
     uint8_t indicate,
     uint16_t valueLength,
     uint8_t *value,
-    bool trapRead,
+    uint8_t trapReadWrite,
     ble_gap_conn_sec_mode_t cccdWritePermission,
     ble_gap_conn_sec_mode_t attrReadPermission,
     ble_gap_conn_sec_mode_t attrWritePermission,
@@ -117,6 +117,7 @@ void loadKeysFromFlash(ble_gap_sec_keyset_t* keys,
     unsigned short *noOfCccds);
 
 void allocateMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys);
+void clearSecurityKeys(ble_gap_sec_keyset_t* keys);
 void freeMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys);
 #endif
 

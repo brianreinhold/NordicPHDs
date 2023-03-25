@@ -379,7 +379,7 @@ ret_code_t createStandardCharacteristic(
 
     attr_md.vloc = BLE_GATTS_VLOC_STACK;
     attr_md.rd_auth = ((TRAP_BOTH == trapReadWrite) || (TRAP_READ == trapReadWrite)) ? 1 : 0;
-    attr_md.wr_auth = ((TRAP_BOTH == trapReadWrite) || (TRAP_WRITE == trapReadWrite)) ? 1 : 0;;
+    attr_md.wr_auth = ((TRAP_BOTH == trapReadWrite) || (TRAP_WRITE == trapReadWrite)) ? 1 : 0;
     attr_md.vlen = 1;
 
     memset(&attr_char_value, 0, sizeof(attr_char_value));
@@ -716,7 +716,7 @@ void saveKeysToFlash(ble_gap_sec_keyset_t* keys,
                sizeof(unsigned short) +
                sizeof(unsigned short) +
                sizeof(unsigned long long) +  // latest time count (for time line check)
-               #if (HEART_RATE == 1 || SPIROMETER == 1)
+               #if (HEART_RATE == 1 || SPIROMETER == 1 || USES_STORED_DATA == 0)
                    0;
                #else
                    (sizeof(s_MsmtData) * numberOfStoredMsmtGroups );
@@ -755,12 +755,14 @@ void saveKeysToFlash(ble_gap_sec_keyset_t* keys,
     ptr = ptr + sizeof(unsigned short);
     memcpy(ptr, &latestTimeStamp, sizeof(unsigned long long));          // Load the latest time stamp for time line change check
     ptr = ptr + sizeof(unsigned long long);
-    if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
-    {
-        #if (HEART_RATE != 1 && SPIROMETER != 1)
-            memcpy(ptr, storedMsmts, sizeof(s_MsmtData) * numberOfStoredMsmtGroups); // Load the stored measurements
-        #endif
-    }
+    #if(USES_STORED_DATA == 1)
+        if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
+        {
+            #if (HEART_RATE != 1 && SPIROMETER != 1)
+                memcpy(ptr, storedMsmts, sizeof(s_MsmtData) * numberOfStoredMsmtGroups); // Load the stored measurements
+            #endif
+        }
+    #endif
     
     // Now we have to write the data in hunks into flash
     // Each page is 1024 bytes, and a write is in 4-byte hunks
@@ -871,12 +873,14 @@ void loadKeysFromFlash(ble_gap_sec_keyset_t* keys,
         addr = addr + sizeof(unsigned short);
         memcpy(&latestTimeStamp, addr, sizeof(unsigned long long));
         addr = addr + sizeof(unsigned long long);
-        if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
-        {
-            #if (HEART_RATE != 1 && SPIROMETER != 1)
-                memcpy(storedMsmts, addr, numberOfStoredMsmtGroups * sizeof(s_MsmtData));// Load the stored measurements
-            #endif
-        }
+        #if(USES_STORED_DATA == 1)
+            if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
+            {
+                #if (HEART_RATE != 1 && SPIROMETER != 1)
+                    memcpy(storedMsmts, addr, numberOfStoredMsmtGroups * sizeof(s_MsmtData));// Load the stored measurements
+                #endif
+            }
+        #endif
     }
 }
 

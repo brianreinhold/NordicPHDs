@@ -4,11 +4,11 @@
 #include "stdbool.h"
 #include "MderFloat.h"
 
-#define OPCODE_LENGTH  1                        /**< Length of opcode inside PO Measurement packet. */
-#define HANDLE_LENGTH  2                        /**< Length of handle inside PO Measurement packet. */
+#define OPCODE_LENGTH  1                        /**< Nordic info: Length of opcode inside PO Measurement packet. */
+#define HANDLE_LENGTH  2                        /**< Noridic Info: Length of handle inside PO Measurement packet. */
 //#define MAX_CHAR_LEN   (BLE_L2CAP_MTU_MIN - OPCODE_LENGTH - HANDLE_LENGTH)  /**< Maximum size of a transmitted PO Measurement. */
 
-
+//===================================== COMMANDS
 #define COMMAND_GET_SYS_INFO 0x000A             // This command gets the system info. Since it is static for the lifetime
                                                 // of the PHD, if the PHG already has this data it need not ask for it again.
                                                 // This command must come before the requesting of any measurement data.
@@ -17,45 +17,78 @@
                                                 // details of the response have not been specified but it will have something
                                                 // like a list of measurements supported by the PHD, such as a list of MDC
                                                 // Type codes. This command must come before the requesting of any measurement data.
+                                                // A PHD may respond to this command with METCP_COMMAND_UNSUPPORTED.
+                                                // At the moment there is no need for the PHG to obtain this information in order 
+                                                // for this protocol to work.
                                                 
-#define COMMAND_GET_CURRENT_TIME 0x000C         // This command gets the current time info. The PHG shall send this command every
-                                                // connection. This command must come before the requesting of any measurement data.
+#define COMMAND_GET_CURRENT_TIME 0x000C         // This command gets the current time info. The PHG shall send this command before
+                                                // the requesting of any measurement data. The PHD can respond to this command with 
+                                                // METCP_COMMAND_UNSUPPORTED. A PHG shall send this command on every first-time connection
+                                                // and shall send this command on every connection if the PHD does not respond with
+                                                // 'METCP_COMMAND_UNSUPPORTED' on the first time connection.
                                                 
 #define COMMAND_SET_CURRENT_TIME 0x000D         // If the PHD supports setting the time the PHG shall set the time if the time has
                                                 // not been set. If the time is set, the PHD shall adjust the time stamps of any 
                                                 // unsent measurements accordingly to the new time line and all subsequent measurements
                                                 // will be on this new time line. Only absolute and base offset times can be set.
                                                 // The PHG will never have to handle date-time-adjustments. This command must
-                                                // come before the requesting of any measurement data.
-                                                // If the value of the time sync is TIME_SYNC_NONE the time has not be set.
+                                                // come before the requesting of any measurement data. If the value of the time sync
+                                                // is TIME_SYNC_NONE the time has not be set or needs to be set.
                                                 
 #define COMMAND_GET_NUMBER_OF_STORED_RECORDS 0x000E // This command asks the PHD for the number of stored records. A record is
                                                     // a measurement group. The PHD returns the number of records and the
                                                     // epoch time of the first record followed by the epoch time of the last
                                                     // record, even if it does not support getting records by epoch time.
-                                                    // A PHD can respond to this command with unsupported if it does not
-                                                    // perisistently store data.
+                                                    // A PHD can respond to this command with METCP_COMMAND_UNSUPPORTED if it 
+                                                    // does not perisistently store data.
                                                     
 #define COMMAND_GET_ALL_STORED_RECORDS 0x000F       // This command requests all stored records. The PHG may skip this command if
-                                                    // the number of stored records is 0 OR the PHG does not want the data.
-                                                    // A PHD can respond to this command with unsupported.
+                                                    // if the PHG does not want the data. A PHD can respond to this command with 
+                                                    // METCP_COMMAND_UNSUPPORTED.
 
 #define COMMAND_GET_STORED_RECORDS_BY_INDEX 0x0010  // This command requests all stored records by index. The first record is index
-                                                    // 0 and the last record index is the number of stored records - 1.
-                                                    // A PHD can respond to this command with unsupported.
+                                                    // 0 and the last record index is the number of stored records - 1 returned by the
+                                                    // 'COMMAND_GET_NUMBER_OF_STORED_RECORDS' command. A PHD can respond to this command
+                                                    // with METCP_COMMAND_UNSUPPORTED.
 #define COMMAND_GET_STORED_RECORDS_BY_TIME 0x0011   // This command requests all stored records by time epoch. The epoch time of the
                                                     // first and last records is returned in the get number of stored records command
                                                     // The epoch is the six-byte value in the resolution and time type used by the server.
-                                                    // A PHD can respond to this command with unsupported.
+                                                    // A PHD can respond to this command with METCP_COMMAND_UNSUPPORTED or if the time values
+                                                    // are bad or out of range with 'METCP_COMMAND_ERROR'
                                                     
-#define COMMAND_DELETE_ALL_STORED_RECORDS 0x0012    // The PHG may request deletion of the stored data. The PHD may not support this
-                                                    // command.
-                                                    // A PHD can respond to this command with unsupported.
+#define COMMAND_DELETE_ALL_STORED_RECORDS 0x0012    // The PHG may request deletion of the stored data. The PHD may respond to this
+                                                    // command with METCP_COMMAND_UNSUPPORTED even if it persistently stores data.
                                                     
 #define COMMAND_SEND_LIVE_DATA 0x0013               // The PHG sends this command to request live data. Once this command is sent, the
                                                     // PHG shall not request any of the previous commands. At the moment no command has
                                                     // been defined for stopping the live data. However, a PHG can disable the characteristic.
 #define COMMAND_PROPRIETARY 0xFFFF
+
+//============================= COMMAND RESPONSES
+                                                    // All responses are indicated on the command characteristic.
+#define METCP_COMMAND_DONE 0                        // The PHD sends this response when a command is completed successfully. When the
+                                                    // PHG receives this response, it can send another command.
+#define METCP_COMMAND_RECORD_DONE 1                 // The PHD sends this response when it completes the sending of all fragments of a
+                                                    // measurement record. It is only used on the completion of a measurement record.
+                                                    // It tells the PHG that all the data for that record has been delivered and the
+                                                    // PHG can handle it. Thus, in the case of stored data, when the last record is sent,
+                                                    // the PHG will receive METCP_COMMAND_RECORD_DONE response followed by the METCP_COMMAND_DONE
+                                                    // response. The PHG shall not send an additional command until after it receives the
+                                                    // METCP_COMMAND_DONE response.
+#define METCP_COMMAND_UNSUPPORTED 2                 // The PHD sends this response when it does not support the command
+#define METCP_COMMAND_UNKNOWN 3                     // The PHD sends this response when it does not understand the command. An old PHD would
+                                                    // send this command in response to a newly defined command.
+#define METCP_COMMAND_ERROR_BUSY 4                  // The PHD sends this response if the PHG sends a command before the PHD has completed
+                                                    // a previous command. The idea of this model is that it is synchronous to keep communications
+                                                    // and code robust.
+#define METCP_COMMAND_ERROR 5                       // The PHD sends this response if it understands the command but there is something wrong with
+                                                    // the command format such that it cannot use it, or the command cannot be obtained (the command
+                                                    // is two bytes so a one-byte command would cause this error).
+
+#define TRAP_NONE 0  // We dont do the nordic authentic read or write
+#define TRAP_READ 1
+#define TRAP_WRITE 2
+#define TRAP_BOTH 3
 
 // System Info flags
 #define SYSINFO_FLAGS_REG_STATUS 1
@@ -125,29 +158,22 @@
 //#define FACTOR 10L      // For tenths
 //#define FACTOR 1L       // For seconds
 
-#define MET_TIME_FLAG_UNKNOWN_TIMELINE 0x40 // 01000000
+#define MET_TIME_FLAG_UNKNOWN_TIMELINE 0x40 // 0100 0000  Inverse 1011 1111 = 0xBF
 
 #define MET_TIME_OFFSET_UNSUPPORTED 0x80
 
 #define MET_TIME_EPOCH_DEFAULT 631152000L     // Time to 2020 from year 2000
                                               //662774400L     // Time to 2021 01 01 00 00 00.000 from 2000 in seconds
 
-#define  MET_TIME_LENGTH 10
-#define  MET_TIME_INDEX_EPOCH 0
-#define  MET_TIME_INDEX_FLAGS 6
-#define  MET_TIME_INDEX_OFFSET 7
-#define  MET_TIME_INDEX_TIME_SYNC 8
+#define  MET_TIME_LENGTH 10             // Length of the epoch time or time stamp
+#define  MET_TIME_INDEX_EPOCH 0         // index of 6-byte epoch in time stamp
+#define  MET_TIME_INDEX_FLAGS 6         // index of the flags
+#define  MET_TIME_INDEX_OFFSET 7        // index of the offset
+#define  MET_TIME_INDEX_TIME_SYNC 8     // index of the 2-byte time sync
 
 #define PACKET_TYPE_NORMAL 0
 #define PACKET_TYPE_OPTIMIZED_FIRST 1
 #define PACKET_TYPE_OPTIMIZED_FOLLOWS 2
-
-#define METCP_COMMAND_DONE 0
-#define METCP_COMMAND_RECORD_DONE 1
-#define METCP_COMMAND_UNSUPPORTED 2
-#define METCP_COMMAND_UNKNOWN 3
-#define METCP_COMMAND_ERROR_BUSY 4
-#define METCP_COMMAND_ERROR 5
 
 #define BLUETOOTH_SPECIALIZATION_NOT_FOUND -1
 #define BLUETOOTH_MEASUREMENTS_SENT 0

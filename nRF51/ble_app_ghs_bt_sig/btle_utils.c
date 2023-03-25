@@ -874,6 +874,19 @@ void allocateMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys)
     keys->keys_peer.p_pk = calloc(1, sizeof(ble_gap_lesc_p256_pk_t));
 }
 
+void clearSecurityKeys(ble_gap_sec_keyset_t* keys)
+{
+    memset(keys->keys_own.p_enc_key, 0, sizeof(ble_gap_enc_key_t));
+    memset(keys->keys_own.p_id_key, 0, sizeof(ble_gap_id_key_t));
+    memset(keys->keys_own.p_sign_key, 0, sizeof(ble_gap_sign_info_t));
+    memset(keys->keys_own.p_pk, 0, sizeof(ble_gap_lesc_p256_pk_t));
+
+    memset(keys->keys_peer.p_enc_key, 0, sizeof(ble_gap_enc_key_t));
+    memset(keys->keys_peer.p_id_key, 0, sizeof(ble_gap_id_key_t));
+    memset(keys->keys_peer.p_sign_key, 0, sizeof(ble_gap_sign_info_t));
+    memset(keys->keys_peer.p_pk, 0, sizeof(ble_gap_lesc_p256_pk_t));
+}
+
 void freeMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys)
 {
     if (keys->keys_own.p_enc_key != NULL) free(keys->keys_own.p_enc_key);

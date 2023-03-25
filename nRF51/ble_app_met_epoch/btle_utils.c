@@ -319,7 +319,7 @@ ret_code_t createStandardCharacteristic(
     uint8_t indicate,
     uint16_t valueLength,
     uint8_t *value,
-    bool trapRead,
+    uint8_t trapReadWrite,
     ble_gap_conn_sec_mode_t cccdWritePermission,
     ble_gap_conn_sec_mode_t attrReadPermission,
     ble_gap_conn_sec_mode_t attrWritePermission,
@@ -377,8 +377,8 @@ ret_code_t createStandardCharacteristic(
     attr_md.write_perm.lv = attrWritePermission.lv;
 
     attr_md.vloc = BLE_GATTS_VLOC_STACK;
-    attr_md.rd_auth = trapRead ? 1 : 0;
-    attr_md.wr_auth = 0;
+    attr_md.rd_auth = ((TRAP_BOTH == trapReadWrite) || (TRAP_READ == trapReadWrite)) ? 1 : 0;
+    attr_md.wr_auth = ((TRAP_BOTH == trapReadWrite) || (TRAP_WRITE == trapReadWrite)) ? 1 : 0;
     attr_md.vlen = 1;
 
     memset(&attr_char_value, 0, sizeof(attr_char_value));
@@ -460,7 +460,7 @@ void saveKeysToFlash(ble_gap_sec_keyset_t* keys,
                sizeof(unsigned short) +      // specialization
                sizeof(unsigned short) +      // number of stored data
                sizeof(unsigned long long) +  // latest time count (for time line check)
-               #if (HEART_RATE == 1 || SPIROMETER == 1)
+               #if (HEART_RATE == 1 || SPIROMETER == 1 || USES_STORED_DATA == 1)
                    0;
                #else
                    (sizeof(s_MsmtData) * numberOfStoredMsmtGroups );
@@ -499,9 +499,10 @@ void saveKeysToFlash(ble_gap_sec_keyset_t* keys,
     ptr = ptr + sizeof(unsigned short);
     memcpy(ptr, &latestTimeStamp, sizeof(unsigned long long));          // Load the latest time stamp for time line change check
     ptr = ptr + sizeof(unsigned long long);
+    #if(USES_STORED_DATA == 1)
     if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
     {
-        #if (HEART_RATE != 1 && SPIROMETER != 1 && USES_STORED_DATA == 1)
+        #if (HEART_RATE != 1 && SPIROMETER != 1)
             char buffer[512];
             memset(buffer, 0, 512);
             NRF_LOG_INFO("Stored data %s\r\n", (uint32_t)byteToHex((uint8_t *)storedMsmts, buffer, " ", sizeof(s_MsmtData)));
@@ -509,6 +510,7 @@ void saveKeysToFlash(ble_gap_sec_keyset_t* keys,
             memcpy(ptr, storedMsmts, sizeof(s_MsmtData) * numberOfStoredMsmtGroups); // Load the stored measurements
         #endif
     }
+    #endif
     
     // Now we have to write the data in hunks into flash
     // Each page is 1024 bytes, and a write is in 4-byte hunks
@@ -630,16 +632,18 @@ void loadKeysFromFlash(ble_gap_sec_keyset_t* keys,
         addr = addr + sizeof(unsigned short);
         memcpy(&latestTimeStamp, addr, sizeof(unsigned long long));
         addr = addr + sizeof(unsigned long long);
-        if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
-        {
-            #if (HEART_RATE != 1 && SPIROMETER != 1 && USES_STORED_DATA == 1)
-                char buffer[512];
-                memset(buffer, 0, 512);
-                memcpy(storedMsmts, addr, numberOfStoredMsmtGroups * sizeof(s_MsmtData));// Load the stored measurements
-                NRF_LOG_INFO("Stored data %s\r\n", (uint32_t)byteToHex((uint8_t *)storedMsmts, buffer, " ", sizeof(s_MsmtData)));
-                NRF_LOG_FLUSH();
-            #endif
-        }
+        #if(USES_STORED_DATA == 1)
+            if (numberOfStoredMsmtGroups > 0 && numberOfStoredMsmtGroups <= NUMBER_OF_STORED_MSMTS)
+            {
+                #if (HEART_RATE != 1 && SPIROMETER != 1)
+                    char buffer[512];
+                    memset(buffer, 0, 512);
+                    memcpy(storedMsmts, addr, numberOfStoredMsmtGroups * sizeof(s_MsmtData));// Load the stored measurements
+                    NRF_LOG_INFO("Stored data %s\r\n", (uint32_t)byteToHex((uint8_t *)storedMsmts, buffer, " ", sizeof(s_MsmtData)));
+                    NRF_LOG_FLUSH();
+                #endif
+            }
+        #endif
     }
 }
 
@@ -654,6 +658,19 @@ void allocateMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys)
     keys->keys_peer.p_id_key = calloc(1, sizeof(ble_gap_id_key_t));
     keys->keys_peer.p_sign_key = calloc(1, sizeof(ble_gap_sign_info_t));
     keys->keys_peer.p_pk = calloc(1, sizeof(ble_gap_lesc_p256_pk_t));
+}
+
+void clearSecurityKeys(ble_gap_sec_keyset_t* keys)
+{
+    memset(keys->keys_own.p_enc_key, 0, sizeof(ble_gap_enc_key_t));
+    memset(keys->keys_own.p_id_key, 0, sizeof(ble_gap_id_key_t));
+    memset(keys->keys_own.p_sign_key, 0, sizeof(ble_gap_sign_info_t));
+    memset(keys->keys_own.p_pk, 0, sizeof(ble_gap_lesc_p256_pk_t));
+
+    memset(keys->keys_peer.p_enc_key, 0, sizeof(ble_gap_enc_key_t));
+    memset(keys->keys_peer.p_id_key, 0, sizeof(ble_gap_id_key_t));
+    memset(keys->keys_peer.p_sign_key, 0, sizeof(ble_gap_sign_info_t));
+    memset(keys->keys_peer.p_pk, 0, sizeof(ble_gap_lesc_p256_pk_t));
 }
 
 void freeMemoryForSecurityKeys(ble_gap_sec_keyset_t* keys)

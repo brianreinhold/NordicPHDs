@@ -16,7 +16,7 @@
 
 #define NUMBER_OF_STORED_MSMTS 30
 #define SUPPORT_PAIRING 1  // 1: requires pairing/bonding 0: no pairing or bonding
-#define USES_STORED_DATA 1 // 0 = no stored data of any type
+#define USES_STORED_DATA 0 // 0 = no stored data of any type
                            // 1 = treat as persistently stored data (RACP)
                            // 2 = TODO: use as temporarily stored data
 #define USES_LIVE_DATA 1
@@ -221,7 +221,7 @@ unsigned short getNumberOfStoredRecords(unsigned char* cmd, unsigned short len);
 long getStartIndexInStoredRecords(unsigned char* cmd, unsigned short len);
 bool encodeSpecializationMsmts(s_MsmtData *msmt);
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp);
-void setNotOnCurrentTimeline(unsigned long long newCount);
+void setNotOnCurrentTimeline();
 void cleanUpSpecializations(void);
 void reset_specializations(void);
 

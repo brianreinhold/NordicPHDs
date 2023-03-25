@@ -10,9 +10,9 @@
  * selected at a given time. Setting more than one will cause a compile error. These specializations
  * follow the model (their so-called DIM) specified in the IEEE specialization standards.
  */
-#define BP_CUFF 0
+#define BP_CUFF 1
 #define PULSE_OX 0
-#define GLUCOSE 1           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
+#define GLUCOSE 0           // Be sure USES_STORED_DATA and USES_TIMESTAMP are set to 1 or nothing will happen
 #define HEART_RATE 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
 #define SPIROMETER 0        // USES_STORED_DATA can be set to 0 since this implementation does not support stored data
 #define SCALE 0
@@ -56,7 +56,7 @@ extern s_TimeInfoData *sTimeInfoData;
 extern s_SystemInfoData *systemInfoData;
 //extern unsigned short timeSync;
 extern unsigned short numberOfStoredMsmtGroups;
-extern unsigned short initialNumberOfStoredMsmtGroups;
+extern bool stored_data_same;
 extern unsigned long long latestTimeStamp;
 extern unsigned long long epoch;
 extern unsigned long long factor;
@@ -276,7 +276,8 @@ void deleteStoredSpecializationMsmts(void);
 bool encodeSpecializationMsmts(s_MsmtData *msmt);
 void generateLiveDataForSpecializations(unsigned long live_data_count, unsigned long long timeStampMsmt, unsigned long timeStamp);
 void populate_epoch_range_of_stored_data(unsigned char *epoch_range);
-void setNotOnCurrentTimeline(unsigned long long newCount);
+void setNotOnCurrentTimeline(void);
+void reset_specializations(void);
 void cleanUpSpecializations(void);
 
 #endif

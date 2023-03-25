@@ -1871,9 +1871,11 @@ void sendStoredSpecializationMsmts(unsigned short stored_count)
 /**
  * Deletes all the stored data. Called when the PHG sends delete stored data command
  */
+
 void deleteStoredSpecializationMsmts(void)
 {
     memset(&storedMsmts, 0, NUMBER_OF_STORED_MSMTS * sizeof(s_MsmtData));
+    stored_msmts_same = false;
 }
 #endif
 
@@ -2098,7 +2100,7 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
     #endif
 }
 
-void setNotOnCurrentTimeline(unsigned long long newCount)
+void setNotOnCurrentTimeline(void)
 {
     int i;
     #if (USES_STORED_DATA >= 1)

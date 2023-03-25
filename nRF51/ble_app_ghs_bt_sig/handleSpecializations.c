@@ -55,7 +55,7 @@ s_SystemInfo *systemInfo                        = NULL;     // We need to keep t
 unsigned short pairing                          = SUPPORT_PAIRING;        // Value of 1 indicates that pairing/bonding is required.
 unsigned char batteryCharValue                  = 0x63;
 unsigned short numberOfStoredMsmtGroups         = 0;
-unsigned short initialNumberOfStoredMsmtGroups  = 0;
+bool stored_msmts_same                          = true;  // When true, we do not need to update flash due to stored data changes
 unsigned long long latestTimeStamp              = 0;
 unsigned long msmt_id                           = 1;
 unsigned long recordNumber                      = 0;
@@ -1868,6 +1868,7 @@ void sendStoredSpecializationMsmts(unsigned short stored_count)
 void deleteStoredSpecializationMsmts(void)
 {
     memset(&storedMsmts, 0, NUMBER_OF_STORED_MSMTS * sizeof(s_MsmtData));
+    stored_msmts_same = false;
 }
 #endif
 
@@ -2084,7 +2085,7 @@ void handleSpecializationsOnSetTime(unsigned short numberOfStoredMsmtGroups, lon
              storedMsmts[i].common.sGhsTime.epoch = (diff < 0) ? storedMsmts[i].common.sGhsTime.epoch - udiff
                         : storedMsmts[i].common.sGhsTime.epoch + diff;
              storedMsmts[i].common.sGhsTime.timeSync = timeSync;
-             initialNumberOfStoredMsmtGroups = 0; // This will assure flash gets written
+             stored_msmts_same = false; // This will assure flash gets written
              NRF_LOG_DEBUG("Updated time on msmt %u ", i);
          }
     }
@@ -2096,6 +2097,7 @@ void setNotOnCurrentTimeline(void)
     for (i = 0; i < numberOfStoredMsmtGroups; i ++)
     {
         storedMsmts[i].common.sGhsTime.flagKnownTimeline = 0;
+        stored_msmts_same = false;
     }
 }
 

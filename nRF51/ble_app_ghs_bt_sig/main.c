@@ -1401,6 +1401,7 @@ static void racp_handler(unsigned char *cmd, unsigned short len)
                 // Respond with command done
                 printCommand(str, global_send.current_command);
                 createRacpResponse(DELETE_RECORDS_RESP_SUCCESS, 4);
+                stored_msmts_same = false;
                 send_flag = true;
             }
             else
@@ -1700,11 +1701,11 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 bool isEqual = ((currentSysDataLength == saveDataLength)
                                 && (saveDataLength > 0 && saveDataBuffer != NULL)
                                 && (memcmp(saveDataBuffer, currentSysDataBuffer, saveDataLength) == 0)
-                                && (numberOfStoredMsmtGroups == initialNumberOfStoredMsmtGroups));
+                                && stored_msmts_same);
                 if (isEqual)
                 {
                     NRF_LOG_INFO("Flash write not needed; data is equal to what is already in flash\r\n");
-                    flash_write_needed = false;
+                    flash_write_needed = stored_msmts_same;
                 }
                 else
                 {
@@ -1723,7 +1724,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
             {
                 latestTimeStamp = getRtcTicks();
                 saveKeysToFlash(&keys, &saveDataBuffer, &saveDataLength, cccdSet, &noOfCccds);
-                initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+                stored_msmts_same = true;
                 break;
             }
             reset_specializations();
@@ -2121,19 +2122,27 @@ static void receive_new_measurement(uint8_t * p_data)
                     NRF_LOG_DEBUG("Stored data generator called at timestamp32 %lu\r\n", getTicks());
                     generateAndAddStoredMsmt(getRtcTicks(), getTicks(), numberOfStoredMsmtGroups);
                     numberOfStoredMsmtGroups++;
+                    stored_msmts_same = false;
                 #endif
             }
             break;
 
             case BSP_EVENT_KEY_1:
-                NRF_LOG_DEBUG("Sending disconnect\r\n");
-                ghs_abort = false;
-                app_timer_start(m_ghs_disconnect_timer_id, GHS_COMMAND_DELAY, NULL);
-              //  start_shutdown = true;
-              //  done_timer = getTicks();
-             //   app_timer_stop(m_ghs_live_data_timer_id);
-             //   createRacpResponse(SENSOR_DONE, 2);
-                //send_flag = true;
+                if (m_connection_handle != BLE_CONN_HANDLE_INVALID)
+                {
+                    NRF_LOG_INFO("Sending disconnect");
+                    ghs_abort = false;
+                    app_timer_start(m_ghs_disconnect_timer_id, GHS_COMMAND_DELAY, NULL);
+                }
+                else
+                {
+                    NRF_LOG_INFO("Clearing pairing and stored data");
+                    numberOfStoredMsmtGroups = 0;
+                    #if(USES_STORED_DATA == 1)
+                        deleteStoredSpecializationMsmts();
+                    #endif
+                    clearSecurityKeys(&keys);
+                }
                 break;
 
             case BSP_EVENT_KEY_2:
@@ -2217,7 +2226,7 @@ static void initializeBluetooth()
 
     memset(cccds, 0, noOfCccds);
     loadKeysFromFlash(&keys, &saveDataBuffer, &saveDataLength, cccds, &noOfCccds);
-    initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+    stored_msmts_same = true;
     NRF_LOG_DEBUG("Number of saved stored measurements in flash %u\r\n", numberOfStoredMsmtGroups);
     memcpy(cccdSet, cccds, noOfCccds);  // destination, source, length
     

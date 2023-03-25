@@ -137,7 +137,7 @@
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000, APP_TIMER_PRESCALER) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                           /**< Number of attempts before giving up the connection parameter negotiation. */
 
-#define GHS_COMMAND_DELAY               APP_TIMER_TICKS(50, APP_TIMER_PRESCALER)
+#define MET_COMMAND_DELAY               APP_TIMER_TICKS(50, APP_TIMER_PRESCALER)
 #if (SPIROMETER == 1)
     #define MET_LIVE_DELAY                  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)
 #else
@@ -180,6 +180,10 @@ APP_TIMER_DEF(m_met_disconnect_timer_id);      /**< disconnect handler */
 APP_TIMER_DEF(m_met_live_data_timer_id);
 APP_TIMER_DEF(m_met_flash_write_timer_id);
 APP_TIMER_DEF(m_app_dummy_timer_id);
+
+#define COMMAND_CHAR 0
+#define RESPONSE_CHAR 1
+static uint8_t                  cp_write[18];
 
 static bool                     stored_data_done_sent;
 
@@ -455,7 +459,7 @@ void dummy(void * p_context)
     UNUSED_PARAMETER(p_context);
 }
 
-static void command_handler(void * p_context);
+static void command_handler(uint16_t index);
 static void write_flash(void * p_context);
 static void live_data_handler(void * p_context);
 static void timers_init(void)
@@ -600,6 +604,74 @@ static void getCurrentTime()
 }
 #endif
 
+static void handleSetTime(unsigned char *setTime);
+
+static void print_command(char *str)
+{
+    NRF_LOG_INFO("====> Received %s (%u) command at time %u.\r\n", (uint32_t )str, global_send.current_command, getTicks());
+}
+
+static bool do_auth_write_request(ble_evt_t * p_ble_evt)
+{
+    NRF_LOG_DEBUG("Read write authorized request signaled");
+    if (p_ble_evt->evt.gatts_evt.params.authorize_request.type == BLE_GATTS_AUTHORIZE_TYPE_WRITE)
+    {
+        NRF_LOG_DEBUG("Write authorized request at time %u", getTicks());
+        ret_code_t err_code;
+        ble_gatts_rw_authorize_reply_params_t reply;
+        memset(&reply, 0, sizeof(ble_gatts_rw_authorize_reply_params_t));
+        reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
+
+        // Command from Control Point
+        if (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.handle == m_met_cp_handle.value_handle)
+        {
+            if (cccdSet[COMMAND_CHAR])
+            {
+                uint16_t index = 0;
+                reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
+                reply.params.write.update = 1;
+                reply.params.write.len = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.len;
+                reply.params.write.p_data = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data;
+                err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
+                if (err_code != NRF_SUCCESS)
+                {
+                    NRF_LOG_ERROR("RW GHS CP reply gave error %u:", err_code);
+                }
+                uint16_t command = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[0] +
+                    (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[1] << 8);
+                global_send.current_command = command;
+                NRF_LOG_DEBUG("Command %d written on CP at time %u", command, getTicks());
+
+                #if (USES_TIMESTAMP == 1)
+                    if (command == COMMAND_SET_CURRENT_TIME)
+                    {
+                        print_command("Set Current Time");
+                        handleSetTime(&p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[2]);
+                    }
+                #endif
+                #if (USES_STORED_DATA == 1)
+                    if (command == COMMAND_GET_STORED_RECORDS_BY_INDEX)
+                        index = p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[2] +
+                            (p_ble_evt->evt.gatts_evt.params.authorize_request.request.write.data[3] << 8);
+                #endif
+                command_handler(index);
+                return true;
+            }
+            else
+            {
+                NRF_LOG_ERROR("Client has not enabled the Command characteristic");
+                reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR;
+            }
+        }
+        err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle, &reply);
+        return true;
+    }
+    else
+    {
+        NRF_LOG_DEBUG("Received an authorized RW request at time %u with type %u", getTicks(), p_ble_evt->evt.gatts_evt.params.authorize_request.type);
+    }
+    return false;
+}
 
 /**@brief Function for handling the Application's BLE Stack events.
  *
@@ -617,9 +689,10 @@ static bool on_generic_ble_evt(ble_evt_t * p_ble_evt)
             APP_ERROR_CHECK(err_code);
             break; // BLE_EVT_USER_MEM_REQUEST
 
-        // GHS - Should never happen
         case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST:
         {
+            if (do_auth_write_request(p_ble_evt))
+                break;
             ble_gatts_evt_rw_authorize_request_t  req;
             ble_gatts_rw_authorize_reply_params_t auth_reply;
 
@@ -1002,15 +1075,11 @@ static void live_data_handler(void * p_context)
     }
 }
 
-static void print_command(char *str)
-{
-    NRF_LOG_INFO("====> Received %s (%u) command at time %u.\r\n", (uint32_t )str, global_send.current_command, getTicks());
-}
 /**
   Command handler. This method is called when the PHG writes a command on the MET control point.
  */
 
-static void command_handler(void * p_context)
+static void command_handler(uint16_t index)
 {
     global_send.chunk_size = (GATT_MTU_SIZE_DEFAULT - OPCODE_LENGTH - HANDLE_LENGTH);
     switch (global_send.current_command)
@@ -1053,7 +1122,6 @@ static void command_handler(void * p_context)
     break;
     
     case COMMAND_SET_CURRENT_TIME:
-        print_command("Set Current Time");
         // Set the current time info time sync to synced by PHG
     #if (USES_TIMESTAMP == 1)
         // The update of the CurrentTimeInfo byte array as well as the date time adjustments was done in the event
@@ -1085,8 +1153,25 @@ static void command_handler(void * p_context)
     case COMMAND_GET_STORED_RECORDS_BY_INDEX:
         stored_data_done_sent = false;
         print_command("Get Stored Records by index");
-        createCpResponse(METCP_COMMAND_UNSUPPORTED, NULL);
-        send_flag = true;
+        #if (USES_STORED_DATA == 1)
+            if (numberOfStoredMsmtGroups > 0)
+            {
+                if (index >= numberOfStoredMsmtGroups)
+                {
+                    NRF_LOG_DEBUG("----> Sending stored data element number\r\n", index);
+                    global_send.number_of_groups = 1;
+                    sendStoredMeasurements(index);
+                }
+                else
+                {
+                    createCpResponse(METCP_COMMAND_ERROR, NULL);
+                    send_flag = true;
+                }
+            }
+        #else
+            createCpResponse(METCP_COMMAND_UNSUPPORTED, NULL);
+            send_flag = true;
+        #endif
         break;
     
     case COMMAND_GET_STORED_RECORDS_BY_TIME:
@@ -1139,38 +1224,36 @@ static void command_handler(void * p_context)
 }
 
 #if (USES_TIMESTAMP == 1)
-static void handleSetTime(unsigned char *setTime)
-{
-    unsigned short i;
-    unsigned char oldTime[MET_TIME_LENGTH];
-    unsigned char newTime[MET_TIME_LENGTH];
-    unsigned long long oldTimeVal = 0;
-    unsigned long long newTimeVal = 0;
-    long long diff = 0;
-    unsigned short timeSync;
-    char printBuf[64];
-    getCurrentTime();
-    memcpy(oldTime, &sTimeInfoData->timeInfoBuf[sTimeInfoData->currentTime_index], MET_TIME_LENGTH); // destination, source, length
-    memcpy(newTime, setTime, MET_TIME_LENGTH);
-    memset(printBuf, 0, 64);
-    NRF_LOG_INFO("Set Time received: %s\r\n", (uint32_t)byteToHex(newTime, printBuf, " ", MET_TIME_LENGTH));
-    NRF_LOG_FLUSH();
-    updateCurrentTimeFromSetTime(&sTimeInfoData, newTime);
-    for (i = 0; i < 6; i++)
+    static void handleSetTime(unsigned char *setTime)
     {
-         oldTimeVal = (oldTimeVal << 8) + (((unsigned long long)oldTime[5 - i]) & 0xFF);
-         newTimeVal = (newTimeVal << 8) + (((unsigned long long)newTime[5 - i]) & 0xFF);
+        unsigned short i;
+        unsigned char oldTime[MET_TIME_LENGTH];
+        unsigned char newTime[MET_TIME_LENGTH];
+        unsigned long long oldTimeVal = 0ULL;
+        unsigned long long newTimeVal = 0ULL;
+        long long diff = 0LL;
+        unsigned short timeSync;
+        char printBuf[64];
+        getCurrentTime();
+        memcpy(oldTime, &sTimeInfoData->timeInfoBuf[sTimeInfoData->currentTime_index], MET_TIME_LENGTH); // destination, source, length
+        memcpy(newTime, setTime, MET_TIME_LENGTH);
+        memset(printBuf, 0, 64);
+        NRF_LOG_INFO("Set Time received: %s\r\n", (uint32_t)byteToHex(newTime, printBuf, " ", MET_TIME_LENGTH));
+        NRF_LOG_FLUSH();
+        updateCurrentTimeFromSetTime(&sTimeInfoData, newTime);
+        for (i = 0; i < 6; i++)
+        {
+             oldTimeVal = (oldTimeVal << 8) + (((unsigned long long)oldTime[5 - i]) & 0xFF);
+             newTimeVal = (newTimeVal << 8) + (((unsigned long long)newTime[5 - i]) & 0xFF);
+        }
+        diff = newTimeVal - oldTimeVal;
+        epoch = epoch + diff; // Adjust start epoch by difference too. This allows us to get new time by adding current ticks to new start epoch
+                                                                 // How to add an unsigned int to a signed int
+        timeSync = (((unsigned short) newTime[MET_TIME_LENGTH - 2]) & 0xFF) + (newTime[MET_TIME_LENGTH -1 ] << 8);
+        sMetTime->timeSync = timeSync;      // Update the time sync of our 'base' current time
+        // Handles date-time adjustments and updating the time sync in the group data array msmt time stamps
+        handleSpecializationsOnSetTime(numberOfStoredMsmtGroups, diff, timeSync);
     }
-    diff = newTimeVal - oldTimeVal;
-//     NRF_LOG_DEBUG("old time in seconds: %d  new time in seconds: %d diff in seconds\r\n", oldTimeVal/1000, newTimeVal/1000, diff/1000);
-    epoch = (diff < 0) ? (oldTimeVal - newTimeVal) + epoch : epoch + diff;  // Adjust start epoch by difference too. 
-                                                                            // This allows us to get new time by adding current ticks to new start epoch
-//     NRF_LOG_DEBUG("New base epoch: %d \r\n", epoch/1000);
-    timeSync = (((unsigned short) newTime[MET_TIME_LENGTH - 2]) & 0xFF) + (newTime[MET_TIME_LENGTH -1 ] << 8);
-    sMetTime->timeSync = timeSync;      // Update the time sync of our 'base' current time
-    // Handles date-time adjustments and updating the time sync in the group data array msmt time stamps
-    handleSpecializationsOnSetTime(numberOfStoredMsmtGroups, diff, timeSync);
-}
 #endif
 
 /*
@@ -1418,7 +1501,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 bool isEqual = ((currentSysDataLength == saveDataLength)
                                 && (saveDataLength > 0 && saveDataBuffer != NULL)
                                 && (memcmp(saveDataBuffer, currentSysDataBuffer, saveDataLength) == 0)
-                                && (numberOfStoredMsmtGroups == initialNumberOfStoredMsmtGroups));
+                                &&  stored_data_same);      // When true, we do not need to update flash due to stored data changes);
                 if (isEqual)
                 {
                     NRF_LOG_INFO("Flash write not needed; data is equal to what is already in flash\r\n\n\n");
@@ -1444,11 +1527,12 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 // this will disable soft device causing app to reset after flash is written
                 latestTimeStamp = getRtcTicks();
                 saveKeysToFlash(&keys, &saveDataBuffer, &saveDataLength, cccdSet, &noOfCccds);
-                initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+                stored_data_same = true;
                 // Now LEDs wont work - everything is dead due to the sd_softdevice_disable.
                 break;
             }
        //     NRF_LOG_INFO("Got here 6  at time %u\r\n", getTicks());
+            reset_specializations();
             #if (USE_DK == 0)
                 restartAdv = true;
             #endif
@@ -1635,22 +1719,6 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 uint8_t write_data = p_ble_evt->evt.gatts_evt.params.write.data[0];
                 cccdSet[1] = (write_data == 3) ? BLE_GATT_HVX_INDICATION : (write_data & 3);
                 NRF_LOG_INFO("Enabling MET Response CCCD with %d at time %u\r\n", write_data, getTicks());
-            }
-            // Command from control point
-            else if (p_ble_evt->evt.gatts_evt.params.write.handle == m_met_cp_handle.value_handle)
-            {
-                // Get command
-                uint16_t command = p_ble_evt->evt.gatts_evt.params.write.data[0] + (p_ble_evt->evt.gatts_evt.params.write.data[1] << 8);
-                global_send.current_command = command;
-                NRF_LOG_INFO("Command %d written on CP at time %u\r\n", command, getTicks());
-                #if (USES_TIMESTAMP == 1)
-                    if (command == COMMAND_SET_CURRENT_TIME)
-                    {
-                        handleSetTime(&p_ble_evt->evt.gatts_evt.params.write.data[2]);
-                    }
-                #endif
-                NRF_LOG_DEBUG("Calling command handler\r\n");
-                command_handler(NULL);
             }
             break;
 
@@ -1844,19 +1912,36 @@ static void receive_new_measurement(uint8_t * p_data)
                 #if (USES_STORED_DATA == 1 && USES_TIMESTAMP == 1)
                     if ( numberOfStoredMsmtGroups >= NUMBER_OF_STORED_MSMTS)
                     {
-                        NRF_LOG_DEBUG("Stored data buffer full, skipping\r\n");
+                        NRF_LOG_DEBUG("Stored data buffer full, skipping");
                         return;
                     }
-                    generateAndAddStoredMsmt(getRtcTicks(), getTicks(), numberOfStoredMsmtGroups);
-                    numberOfStoredMsmtGroups++;
+                    NRF_LOG_DEBUG("Stored data generator called at timestamp32 %lu", getTicks());
+                    if (generateAndAddStoredMsmt(getRtcTicks(), getTicks(), numberOfStoredMsmtGroups))
+                    {
+                        numberOfStoredMsmtGroups++;
+                        stored_data_same = false;
+
+                    }
                 #endif
             }
             break;
 
             case BSP_EVENT_KEY_1:
-                NRF_LOG_INFO("Sending disconnect\r\n");
-                met_abort = false;
-                app_timer_start(m_met_disconnect_timer_id, GHS_COMMAND_DELAY, NULL);
+                if (m_connection_handle != BLE_CONN_HANDLE_INVALID)
+                {
+                    NRF_LOG_INFO("Sending disconnect");
+                    met_abort = false;
+                    app_timer_start(m_met_disconnect_timer_id, MET_COMMAND_DELAY, NULL);
+                }
+                else
+                {
+                    NRF_LOG_INFO("Clearing pairing and stored data");
+                    numberOfStoredMsmtGroups = 0;
+                    #if(USES_STORED_DATA == 1)
+                        deleteStoredSpecializationMsmts();
+                    #endif
+                    clearSecurityKeys(&keys);
+                }
                 break;
 
             case BSP_EVENT_KEY_2:
@@ -1937,23 +2022,23 @@ static void uart_init(void)
 static void initializeBluetooth()
 {
     ret_code_t err_code;
-    #if (SKIP_FLASH_RELOAD == 0)
     unsigned char cccds[2];
 
     memset(cccds, 0, noOfCccds);
     loadKeysFromFlash(&keys, &saveDataBuffer, &saveDataLength, cccds, &noOfCccds);
-    initialNumberOfStoredMsmtGroups = numberOfStoredMsmtGroups;
+    stored_data_same = true;
     NRF_LOG_DEBUG("Number of saved stored measurements in flash %u\r\n", numberOfStoredMsmtGroups);
     memcpy(cccdSet, cccds, noOfCccds);  // destination, source, length
     
-    if (numberOfStoredMsmtGroups > 0)
-    {
-        NRF_LOG_DEBUG("Factory timer reset: Current tick %u  Saved time of flash write %u\r\n", getRtcTicks(), latestTimeStamp);
-        if (getRtcTicks() < latestTimeStamp)  // Time fault - inspect stored data and set flag on different time line
+    #if (USES_STORED_DATA == 1)
+        if (numberOfStoredMsmtGroups > 0)
         {
-            setNotOnCurrentTimeline(getRtcCount());
+            NRF_LOG_DEBUG("Factory timer reset: Current tick %u  Saved time of flash write %u\r\n", getRtcTicks(), latestTimeStamp);
+            if (getRtcTicks() < latestTimeStamp)  // Time fault - inspect stored data and set flag on different time line
+            {
+                setNotOnCurrentTimeline(getRtcCount());
+            }
         }
-    }
     #endif
 
         // This also provides the callback method to receive events.
@@ -1995,9 +2080,9 @@ static void initializeBluetooth()
         BTLE_MET_CP_CHAR,
         true,   // Has CCCD
         true,   // This will cause indicate instead of notify if CCCD is set to true
-        0,
-        NULL,
-        false,
+        18,
+        cp_write,
+        TRAP_WRITE,
         (ble_gap_conn_sec_mode_t) {1, 1},   // [CCCD write is open]
         (ble_gap_conn_sec_mode_t) {0, 0},   // Reading characteristic value is forbidden
         (ble_gap_conn_sec_mode_t) {1, 1},
@@ -2015,7 +2100,7 @@ static void initializeBluetooth()
         (BLE_GATT_HVX_NOTIFICATION | BLE_GATT_HVX_INDICATION),  // This will cause indicate and notify if CCCD is set to true
         0,
         NULL,
-        false,
+        TRAP_NONE,
         (ble_gap_conn_sec_mode_t)
         {
             1, (SUPPORT_PAIRING + 1)     // CCCD write is secured
