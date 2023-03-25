@@ -1,6 +1,8 @@
 # Nordic-MPM-Health-Devices
 Support for the Metric Packet Model (MPM) Health Devices on Nordic platforms
 
+The Metric Model started as a first proposal to the GHS (Generic Health Sensor).
+
 (At this time users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for references on the GHS)
 
 This respository contains code that runs on the Nordic nRF52840 and nRF51 DKs. The code that runs on the nRF52840 DK should also run without issue on the nRF52 DK though it has not been tested.
