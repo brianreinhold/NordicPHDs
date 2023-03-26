@@ -1,9 +1,19 @@
 # Nordic-MPM-Health-Devices
 Support for the Metric Packet Model (MPM) Health Devices on Nordic platforms
 
-The Metric Model started as a first proposal to the GHS (Generic Health Sensor).
+The Metric Model started as a first proposal to the GHS (Generic Health Sensor). In the Metric Model, GATT is used a simple tunnel and the exchange between client and server is client-driven sequence of commands and responses which is ordered and synchronous. This approach follows that used by many of the proprietary health devices available on the market today. However, the contents of the packets sent over this tunnel had little in common between the proprietary implementations. In the Metric Model, the packet contents is based upon the 20601 Domain Information Model (DIM) Metric objects, thus the name 'Metric Packet Model'. The most significant aspect of this DIM model is the use of codes to specify the semantics. It is this use of codes that make the model generic.
 
-(At this time users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for references on the GHS)
+However, this model was rejected by BT-SIG as it does not follow the server-driven approach of the other BT-SIG health device profiles and makes no use of pre-existing BT-SIG services and characteristics. Nevertheless, this model is kept as any transport that can deliver opaque packets would work and thus it would take little to port this model to ZigBee or USB or TCP or any other reliable transport.
+
+# The GHS implementation
+For details of the GHS spec, which at the time of the writing is in the latter stages of IOP testing but it is not officially adopted. Users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for official references. The GHS has become quite complicated and it is deemed impractical to try and support all the options.
+
+ - The Reconnection Service is not supported
+ - THe User Data Service is not supported
+ - The Multiple Bonds Service is not supported
+ - Only grouped measurements are supported
+ - Only numeric, compound (not mixed), single coded, event/state, and sample array (RTSAs) measurement value types can be used in the group.
+ - 
 
 This respository contains code that runs on the Nordic nRF52840 and nRF51 DKs. The code that runs on the nRF52840 DK should also run without issue on the nRF52 DK though it has not been tested.
 
