@@ -1,23 +1,42 @@
-# Nordic-MPM-Health-Devices
-Support for the Metric Packet Model (MPM) Health Devices on Nordic platforms
+# Nordic MPM and GHS Server implementations
+Support for the Metric Packet Model (MPM) and Generic HEalth Sensor (GHS) Health Devices on Nordic platforms
 
-The Metric Model started as a first proposal to the GHS (Generic Health Sensor). In the Metric Model, GATT is used a simple tunnel and the exchange between client and server is client-driven sequence of commands and responses which is ordered and synchronous. This approach follows that used by many of the proprietary health devices available on the market today. However, the contents of the packets sent over this tunnel had little in common between the proprietary implementations. In the Metric Model, the packet contents is based upon the 20601 Domain Information Model (DIM) Metric objects, thus the name 'Metric Packet Model'. The most significant aspect of this DIM model is the use of codes to specify the semantics. It is this use of codes that make the model generic.
+The Metric Model started as a first proposal to the upcoming GHS (Generic Health Sensor) profile. In the Metric Model, GATT is used as a simple tunnel and all information content is in the packets exchanged over this tunnel. The packet exchange is client-driven, syncrhonous ordered sequence of commands. This approach follows that used by many of the proprietary health devices available on the market today. The packet contents are based upon the 20601 Domain Information Model (DIM) Metric objects, thus the name 'Metric Packet Model'. The most significant aspect of this DIM model is the use of codes to specify the semantics and meanings of the fields. It is this use of codes that make the model generic.
 
-However, this model was rejected by BT-SIG as it does not follow the server-driven approach of the other BT-SIG health device profiles and makes no use of pre-existing BT-SIG services and characteristics. Nevertheless, this model is kept as any transport that can deliver opaque packets would work and thus it would take little to port this model to ZigBee or USB or TCP or any other reliable transport.
+This MPM proposal was rejected by BT-SIG as it does not follow the server-driven approach of the other BT-SIG health device profiles and makes no use of pre-existing BT-SIG services and characteristics. On the other hand, the structure of the measurement packets were, for the most part, retained in the GHS though more options and value types were added. Though the MPM model approach was rejected, it is kept here as it can be applied to any reliable transport such as ZigBee, USB, or TCP.
 
-# The GHS implementation
-For details of the GHS spec, which at the time of the writing is in the latter stages of IOP testing but it is not officially adopted. Users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for official references. The GHS has become quite complicated and it is deemed impractical to try and support all the options.
+## The GHS implementation
+For details of the GHS spec, which at the time of the writing is in the latter stages of IOP testing but it is not officially adopted, users are referred to the upcoming BT-SIG GHSS, GHSP and ETS standards for official references. The GHS has become quite complicated and it is deemed impractical to try and support all the options here. In this implementation of the GHS
 
  - The Reconnection Service is not supported
- - THe User Data Service is not supported
+ - The User Data Service is not supported
  - The Multiple Bonds Service is not supported
+ - Only the 'derived from' reference type is supported thus a measurement can only reference measurements that occur prior to it
  - Only grouped measurements are supported
- - Only numeric, compound (not mixed), single coded, event/state, and sample array (RTSAs) measurement value types can be used in the group.
- - 
+ - Only numeric, compound (not mixed value type), single coded, event/state, and sample array (RTSAs) measurement value types can be used in the group.
 
+Nevertheless, the supported features allow one to support any 20601 specialization and existing market health devices. The services that are excluded have seen minimal if any adoption in market devices so the cost is minimal.
+
+# Nordic Hardware
 This respository contains code that runs on the Nordic nRF52840 and nRF51 DKs. The code that runs on the nRF52840 DK should also run without issue on the nRF52 DK though it has not been tested.
 
-Unlike the existing Bluetooth SIG health device profiles, the Metric Packet Model and GHS are generic and all health devices are supported by a single specification. The MPM is based upon the IEEE 11073 20601 Domain Information Model Objects though in a considerably simplified form. It is not necessary to understand the 20601 standard to work with the MPM. However, use of the MPM (and GHS) requires the understanding of the Medical Device Code (MDC) system and Mder Floats. The use of codes is totally foreign to the BT-SIG profiles but some of the profiles do use Mder Floats. Mder Floats are used to preserve precision.
+The implementations here have several pre-configured specializations
+- Blood Pressure   S L
+- Glucose Monitor   S
+- Health Thermometer S L
+- Heart rate monitor L
+- Pulse Oximeter S L
+- Spirometer L
+- Weigh Scale S L
+
+One can choose to support pairing/bonding or not, support time stamps or not, and those with S can have stored data and those with L can have 'live' data. The reason that the Glucose monitor has only stored data and the heart rate monitor only live data is that it is the common usage in the market today for these devices. Recall that these implementations all generate fake data as there are no sensors involved. A real device would have to replace the fake data generators with data coming from a real sensor either by SPI or UART. The Spirometer data is not 'generated' but a canned set of real data and it takes up a huge amount of space as it has waveforms in it, and that is why it is restricted to 'live'.
+
+As only plays with the various options by setting ther define values in the handleSpecialization.h file, each change is effectively creating a new device. A different Bluetooth address is set for each specialization, but changing options like supprting stored data, live data, or time stamps changes the device. In the case of the GHS, it changes the service tables and characteristics which will completely confuse the peer. Thus if you change these settings you should treat it as a new device, thus clear the flash memory and pairing keys by pressing button 4 before starting advertising. Recall to clear the pairing on the peer as well.
+
+## Metric Packet Model
+The remainder of this document will detail the MPM. As stated above, the user is referred to BT SIG to obtain the GHS related service and profile documents.
+
+Unlike the existing Bluetooth SIG health device profiles, the Metric Packet Model (and GHS) are generic and all health devices are supported by a single specification. The MPM is based upon the IEEE 11073 20601 Domain Information Model Objects though in a considerably simplified form. It is not necessary to understand the 20601 standard to work with the MPM. However, use of the MPM (and GHS) requires the understanding of the Medical Device Code (MDC) system and Mder Floats. The use of codes is totally foreign to the BT-SIG profiles but some of the profiles do use Mder Floats. Mder Floats are used to preserve precision.
 
 The Bluetooth implementation is about as simple as it can get. GATT is used simply as a tunnel. The client sends commands to the server in one characteristic and the server notifies responses through a second characteristic. The exchange is completely synchronous. The endpoints only need to support descriptor and characteristic writes and indications and notifications. There is no need for the server to persist data in its service data tables but the Nordic SoftDevice will do that anyways. Only SoftDevice is used for the Bluetooth.
 
