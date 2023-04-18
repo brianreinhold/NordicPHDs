@@ -44,7 +44,7 @@ Once the program is installed onto the DK:
 
 Button 4 creates a measurement that is stored if you allow stored data. Pressing this button has to be done before starting advertisements.
 Button 3 starts advertising
-Button 2 disconnects.
+Button 2 disconnects if connected, deletes pairing and flash data if not connected
 
 For each of the specialization there is also the option to
 turn off/on pairing
